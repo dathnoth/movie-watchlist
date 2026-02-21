@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<script>
+    // 2. Initialize using your Project URL and Anon Key
+    const supabaseUrl = 'https://your-project-id.supabase.co';
+    const supabaseKey = 'your-anon-public-key';
+    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    // 3. Update your "Add Movie" function
+    async function addToSupabase(movieData) {
+        const { data, error } = await supabase
+            .from('movies')
+            .insert([movieData]);
+        
+        if (!error) fetchMovies(); // Refresh the list
+    }
+
+    // 4. Update your "Fetch" function
+    async function fetchMovies() {
+        const { data, error } = await supabase
+            .from('movies')
+            .select('*');
+        
+        if (data) render(data); // Render your UI with live data
+    }
+</script>
+    <meta charset="UTF-8">
+    <title>CineVault // Movie Tracker</title>
+    <style>
+        :root { --bg: #0f172a; --card: #1e293b; --accent: #38bdf8; --text: #f8fafc; }
+        body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; padding: 2rem; }
+        .search-box { display: flex; gap: 10px; margin-bottom: 2rem; justify-content: center; }
+        input { padding: 12px; border-radius: 8px; border: none; width: 300px; background: var(--card); color: white; }
+        button { padding: 12px 20px; border-radius: 8px; border: none; background: var(--accent); cursor: pointer; font-weight: bold; }
+        
+        .lists-container { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; }
+        .movie-card { background: var(--card); padding: 15px; border-radius: 12px; margin-bottom: 15px; display: flex; gap: 15px; align-items: center; }
+        .movie-card img { width: 60px; border-radius: 4px; }
+        .stars { color: #fbbf24; cursor: pointer; font-size: 1.2rem; }
+        .remove-btn { margin-left: auto; color: #ef4444; cursor: pointer; font-size: 0.8rem; }
+    </style>
+</head>
+<body>
+
+    <h1 style="text-align: center;">🎬 CineVault</h1>
+    
+    <div class="search-box">
+        <input type="text" id="movieInput" placeholder="Enter movie title...">
+        <button onclick="searchMovie()">Search & Add</button>
+    </div>
+
+    <div class="lists-container">
+        <section>
+            <h2>⏳ Want to Watch</h2>
+            <div id="wantList"></div>
+        </section>
+        <section>
+            <h2>✅ Already Watched</h2>
+            <div id="watchedList"></div>
+        </section>
+    </div>
+
+<script>
+    const API_KEY = 'YOUR_OMDB_KEY_HERE'; // Get one at omdbapi.com
+    let myMovies = JSON.parse(localStorage.getItem('myMovies')) || [];
+
+    async function searchMovie() {
+        const title = document.getElementById('movieInput').value;
+        const response = await fetch(`https://www.omdbapi.com/?t=${title}&apikey=${API_KEY}`);
+        const data = await response.json();
+
+        if (data.Response === "True") {
+            const newMovie = {
+                id: data.imdbID,
+                title: data.Title,
+                poster: data.Poster,
+                rating: data.imdbRating,
+                status: 'want', // default status
+                myStars: 0
+            };
+            myMovies.push(newMovie);
+            saveAndRender();
+        } else {
+            alert("Movie not found!");
+        }
+    }
+
+    function toggleStatus(id) {
+        const movie = myMovies.find(m => m.id === id);
+        movie.status = movie.status === 'want' ? 'watched' : 'want';
+        saveAndRender();
+    }
+
+    function setStars(id, stars) {
+        const movie = myMovies.find(m => m.id === id);
+        movie.myStars = stars;
+        saveAndRender();
+    }
+
+    function removeMovie(id) {
+        myMovies = myMovies.filter(m => m.id !== id);
+        saveAndRender();
+    }
+
+    function saveAndRender() {
+        localStorage.setItem('myMovies', JSON.stringify(myMovies));
+        render();
+    }
+
+    function render() {
+        const wantDiv = document.getElementById('wantList');
+        const watchedDiv = document.getElementById('watchedList');
+        wantDiv.innerHTML = ''; watchedDiv.innerHTML = '';
+
+        myMovies.forEach(movie => {
+            const card = `
+                <div class="movie-card">
+                    <img src="${movie.poster}" alt="poster">
+                    <div>
+                        <strong>${movie.title}</strong><br>
+                        <small>IMDb: ${movie.rating}</small><br>
+                        ${movie.status === 'watched' ? renderStars(movie) : `<button onclick="toggleStatus('${movie.id}')">Mark Watched</button>`}
+                    </div>
+                    <span class="remove-btn" onclick="removeMovie('${movie.id}')">Delete</span>
+                </div>
+            `;
+            if (movie.status === 'want') wantDiv.innerHTML += card;
+            else watchedDiv.innerHTML += card;
+        });
+    }
+
+    function renderStars(movie) {
+        let html = '<div class="stars">';
+        for (let i = 1; i <= 5; i++) {
+            html += `<span onclick="setStars('${movie.id}', ${i})">${i <= movie.myStars ? '★' : '☆'}</span>`;
+        }
+        return html + '</div>';
+    }
+
+    render();
+</script>
+</body>
+</html>
