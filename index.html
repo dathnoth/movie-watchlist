@@ -3,13 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>CineVault // Daniel's Collection</title>
-    
+    <title>CineVault // Daniel</title>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#38bdf8">
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root { 
@@ -28,19 +24,20 @@
         }
 
         .app-container { max-width: 1200px; margin: 0 auto; padding: 20px; }
-        .header-area { display: flex; justify-content: center; align-items: center; margin-bottom: 1.5rem; padding-top: 10px; }
-        h1 { font-size: 1.8rem; font-weight: 900; margin: 0; letter-spacing: -1px; }
-        h1 span { color: var(--accent); }
-
-        /* FIXED: Added padding to container so first item doesn't cut off on hover */
-        .search-container { 
-            position: sticky; 
-            top: 10px; 
-            z-index: 100; 
-            margin-bottom: 1rem;
-            padding: 5px; 
-        }
         
+        /* Section Jump Toggle */
+        .nav-toggle {
+            display: flex; background: var(--card); border-radius: 12px;
+            padding: 4px; margin-bottom: 2rem; border: 1px solid rgba(255,255,255,0.05);
+        }
+        .nav-toggle button {
+            flex: 1; background: transparent; border: none; color: #94a3b8;
+            padding: 10px; font-weight: bold; font-size: 0.8rem; cursor: pointer;
+            border-radius: 8px; transition: 0.3s;
+        }
+        .nav-toggle button.active { background: var(--accent); color: #000; }
+
+        .search-container { position: sticky; top: 10px; z-index: 100; margin-bottom: 1rem; }
         input { 
             width: 100%; padding: 16px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.1); 
             background: rgba(15, 23, 42, 0.95); color: white; box-sizing: border-box; font-size: 16px;
@@ -48,19 +45,18 @@
         }
 
         #searchResults { 
-            display: none; gap: 20px; overflow-x: auto; padding: 25px 10px; 
+            display: none; gap: 20px; overflow-x: auto; padding: 30px 15px; 
             scrollbar-width: none;
         }
         #searchResults.active { display: flex; }
 
-        /* LARGER SEARCH POSTERS */
         .search-result-item { 
             min-width: 160px; height: 240px; cursor: pointer; position: relative; 
             border-radius: 12px; overflow: hidden; flex-shrink: 0; transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             border: 1px solid rgba(255,255,255,0.1); background: #000;
         }
         .search-result-item:hover { transform: scale(1.08); border-color: var(--accent); z-index: 10; }
-        .search-result-item img { width: 100%; height: 100%; object-fit: cover; transition: 0.3s; }
+        .search-result-item img { width: 100%; height: 100%; object-fit: cover; }
         .search-result-item:hover img { filter: brightness(0.2) blur(1px); }
 
         .search-overlay {
@@ -71,33 +67,51 @@
         .search-result-item:hover .search-overlay { opacity: 1; }
         .search-title { font-size: 0.85rem; font-weight: 800; color: white; }
 
-        /* Grids */
+        /* Space between sections on mobile */
+        .lists-container { display: flex; flex-direction: column; gap: 60px; } /* Increased gap */
+
         .movie-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 20px; }
         @media (max-width: 600px) { .movie-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; } }
 
         h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 2px; color: #94a3b8; margin: 10px 0 15px 0; border-left: 4px solid var(--accent); padding-left: 12px; }
 
-        .movie-card { background: var(--card); border-radius: 16px; border: 1px solid rgba(255,255,255,0.06); display: flex; flex-direction: column; position: relative; overflow: hidden; transition: 0.3s; }
+        .movie-card { background: var(--card); border-radius: 16px; border: 1px solid rgba(255,255,255,0.06); display: flex; flex-direction: column; position: relative; overflow: hidden; }
         .poster-wrapper { position: relative; width: 100%; padding-top: 150%; overflow: hidden; cursor: pointer; }
-        .card-poster { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; }
+        .card-poster { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
         .card-content { padding: 12px; flex-grow: 1; }
         .movie-title { font-size: 0.95rem; font-weight: 700; cursor: pointer; height: 2.4rem; overflow: hidden; }
 
-        /* Modal Elements */
+        /* Modal Improvements for Mobile */
         #detailsModal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 1000; backdrop-filter: blur(10px); justify-content: center; align-items: center; padding: 20px; }
-        .modal-content { background: #1e293b; max-width: 750px; width: 100%; border-radius: 24px; padding: 30px; border: 1px solid var(--accent); max-height: 85vh; overflow-y: auto; position: relative; }
-        .modal-close { position: absolute; top: 20px; right: 20px; font-size: 1.5rem; cursor: pointer; z-index: 10; }
         
-        .modal-body { display: flex; gap: 25px; flex-wrap: wrap; }
-        /* FIXED: Poster stretch using object-fit contain */
-        .modal-poster { width: 200px; height: 300px; border-radius: 12px; object-fit: contain; background: #000; box-shadow: 0 10px 20px rgba(0,0,0,0.5); }
+        .modal-content { 
+            background: #1e293b; max-width: 750px; width: 100%; border-radius: 24px; padding: 30px; 
+            border: 1px solid var(--accent); max-height: 85vh; overflow-y: auto; position: relative;
+        }
+
+        @media (max-width: 600px) {
+            #detailsModal { align-items: flex-end; padding: 0; } /* Bottom sheet style on mobile */
+            .modal-content { 
+                border-radius: 24px 24px 0 0; 
+                max-height: 90vh; 
+                padding: 40px 20px 20px 20px; 
+                border-bottom: none;
+            }
+            .modal-body { flex-direction: column; align-items: center; text-align: center; }
+            .modal-poster { width: 140px !important; height: 200px !important; }
+            .btn-group { justify-content: center; width: 100%; }
+            .modal-btn { flex: 1; text-align: center; padding: 15px 10px; }
+        }
+
+        .modal-close { position: absolute; top: 15px; right: 15px; font-size: 1.5rem; cursor: pointer; z-index: 10; color: #94a3b8; }
+        .modal-body { display: flex; gap: 25px; }
+        .modal-poster { width: 200px; height: 300px; border-radius: 12px; object-fit: contain; background: #000; }
         
         .btn-group { display: flex; gap: 10px; margin-top: 25px; flex-wrap: wrap; }
-        .modal-btn { padding: 12px 24px; border-radius: 10px; font-weight: 900; text-decoration: none; font-size: 0.85rem; transition: 0.2s; cursor: pointer; border: none; }
+        .modal-btn { padding: 12px 20px; border-radius: 10px; font-weight: 900; text-decoration: none; font-size: 0.85rem; cursor: pointer; border: none; }
         .btn-watched { background: var(--success); color: #000; }
         .btn-imdb { background: #fbbf24; color: #000; }
         .btn-yt { background: var(--yt-red); color: #fff; }
-        .modal-btn:hover { transform: scale(1.05); }
 
         .remove-btn { position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.6); width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.2); z-index: 10; cursor: pointer; }
         .stars { color: #fbbf24; font-size: 1.1rem; margin-top: 10px; }
@@ -108,17 +122,22 @@
 
     <div class="app-container">
         <div class="header-area"><h1>CINE<span>VAULT</span></h1></div>
+
+        <div class="nav-toggle">
+            <button id="btnWatchlist" class="active" onclick="scrollToSection('wantList', 'btnWatchlist')">Watchlist</button>
+            <button id="btnWatched" onclick="scrollToSection('watchedList', 'btnWatched')">Archive</button>
+        </div>
         
         <div class="search-container">
-            <input type="text" id="movieInput" placeholder="Add a new movie to Watchlist..." autocomplete="off">
+            <input type="text" id="movieInput" placeholder="Find a movie..." autocomplete="off">
             <div id="searchResults"></div>
         </div>
 
         <div id="msg"></div>
 
         <div class="lists-container">
-            <section><h2>⏳ Watchlist</h2><div id="wantList" class="movie-grid"></div></section>
-            <section><h2>✅ Watched</h2><div id="watchedList" class="movie-grid"></div></section>
+            <section id="wantSection"><h2>⏳ Watchlist</h2><div id="wantList" class="movie-grid"></div></section>
+            <section id="watchedSection"><h2>✅ Watched</h2><div id="watchedList" class="movie-grid"></div></section>
         </div>
     </div>
 
@@ -144,11 +163,10 @@
         m.style.display = 'block'; setTimeout(() => m.style.display = 'none', 2500);
     }
 
-    // Register Service Worker for PWA
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('sw.js').then(() => console.log('SW Registered'));
-      });
+    function scrollToSection(id, btnId) {
+        document.getElementById(id).scrollIntoView({ behavior: 'smooth', block: 'start' });
+        document.querySelectorAll('.nav-toggle button').forEach(b => b.classList.remove('active'));
+        document.getElementById(btnId).classList.add('active');
     }
 
     document.getElementById('movieInput').addEventListener('input', (e) => {
@@ -200,23 +218,19 @@
         const d = await res.json();
         
         const ytUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(d.Title + ' ' + d.Year + ' official trailer')}`;
-        const isAlreadyWatched = local?.status === 'watched';
+        const isWatched = local?.status === 'watched';
 
         content.innerHTML = `
             <div class="modal-body">
                 <img src="${d.Poster}" class="modal-poster">
-                <div style="flex:1; min-width:280px;">
+                <div style="flex:1;">
                     <h2 style="border:none; padding:0; font-size:1.6rem; color:white; margin:0 0 10px 0;">${d.Title}</h2>
                     <div style="color:var(--accent); font-weight:bold; margin-bottom:15px;">${d.Year} • ${d.Runtime} • ⭐ ${d.imdbRating}</div>
                     <p style="color:#cbd5e1; font-size:0.95rem; line-height:1.6;">${d.Plot}</p>
-                    <div style="background:rgba(255,255,255,0.05); padding:15px; border-radius:12px; font-size:0.9rem; margin-top:20px;">
-                        <p><strong>Director:</strong> ${d.Director}</p>
-                        <p><strong>Cast:</strong> ${d.Actors}</p>
-                    </div>
                     <div class="btn-group">
-                        ${!isAlreadyWatched ? `<button onclick="updateStatus('${id}', 'watched')" class="modal-btn btn-watched">✅ Mark Watched</button>` : ''}
-                        <a href="https://www.imdb.com/title/${id}/" target="_blank" class="modal-btn btn-imdb">View IMDb</a>
-                        <a href="${ytUrl}" target="_blank" class="modal-btn btn-yt">▶ YouTube Trailer</a>
+                        ${!isWatched ? `<button onclick="updateStatus('${id}', 'watched')" class="modal-btn btn-watched">✅ Watched</button>` : ''}
+                        <a href="https://www.imdb.com/title/${id}/" target="_blank" class="modal-btn btn-imdb">IMDb</a>
+                        <a href="${ytUrl}" target="_blank" class="modal-btn btn-yt">Trailer</a>
                     </div>
                 </div>
             </div>`;
@@ -224,9 +238,7 @@
 
     async function updateStatus(id, newStatus) {
         await _supabase.from('movies').update({status: newStatus}).eq('imdb_id', id);
-        closeModal();
-        fetchMovies();
-        notify(`Moved to Watched!`, '#22c55e');
+        closeModal(); fetchMovies(); notify(`Moved to Archive!`, '#22c55e');
     }
 
     function closeModal() { document.getElementById('detailsModal').style.display = 'none'; }
@@ -246,8 +258,7 @@
                     <div style="display:flex; justify-content:space-between; font-size:0.75rem; color:#94a3b8; margin:8px 0;">
                         <span>${m.year}</span><span style="color:#fbbf24;">⭐ ${m.rating}</span>
                     </div>
-                    ${isW ? renderStars(m) : ''}
-                </div>
+                    ${isW ? renderStars(m) : ''} </div>
             </div>`;
             isW ? watched.innerHTML += html : want.innerHTML += html;
         });
