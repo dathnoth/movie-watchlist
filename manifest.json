@@ -1,0 +1,17 @@
+{
+  "name": "Movies",
+  "short_name": "Movies",
+  "description": "Daniel's Personal Movie Watchlist and Archive",
+  "start_url": "watchlist.html",
+  "display": "standalone",
+  "background_color": "#0b0f19",
+  "theme_color": "#38bdf8",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/708/708862.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
