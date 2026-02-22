@@ -5,27 +5,29 @@ const { createClient } = supabase;
 const _supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let debounceTimer;
+let currentSort = 'title';
 
-function notify(text, color) {
-    const m = document.getElementById('msg');
-    m.innerText = text; m.style.backgroundColor = color;
-    m.style.display = 'block'; setTimeout(() => m.style.display = 'none', 2500);
-}
-
-function scrollToSection(id, btnId) {
-    document.getElementById(id).scrollIntoView({ behavior: 'smooth', block: 'start' });
-    document.querySelectorAll('.nav-toggle button').forEach(b => b.classList.remove('active'));
-    document.getElementById(btnId).classList.add('active');
-}
-
+// --- SEARCH LOGIC ---
 document.getElementById('movieInput').addEventListener('input', (e) => {
+    const clearBtn = document.getElementById('clearSearch');
     const resultsDiv = document.getElementById('searchResults');
+    clearBtn.style.display = e.target.value.length > 0 ? 'block' : 'none';
+
     clearTimeout(debounceTimer);
     const q = e.target.value;
     if (q.length < 3) { resultsDiv.classList.remove('active'); resultsDiv.innerHTML = ''; return; }
+    
     resultsDiv.classList.add('active');
     resultsDiv.innerHTML = Array(6).fill('<div class="search-result-item skeleton"></div>').join('');
     debounceTimer = setTimeout(() => liveSearch(q), 300);
+});
+
+document.getElementById('clearSearch').addEventListener('click', () => {
+    const input = document.getElementById('movieInput');
+    input.value = '';
+    document.getElementById('clearSearch').style.display = 'none';
+    document.getElementById('searchResults').classList.remove('active');
+    input.focus();
 });
 
 async function liveSearch(query) {
@@ -33,6 +35,7 @@ async function liveSearch(query) {
     const data = await res.json();
     const resultsDiv = document.getElementById('searchResults');
     resultsDiv.innerHTML = '';
+    
     if (data.Search) {
         data.Search.slice(0, 10).forEach(m => {
             const ytUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(m.Title + ' ' + m.Year + ' trailer')}`;
@@ -43,8 +46,10 @@ async function liveSearch(query) {
                 <div class="search-overlay">
                     <div class="search-title">${m.Title}</div>
                     <div class="search-year">${m.Year}</div>
-                    <button class="overlay-btn btn-add" onclick="event.stopPropagation(); addToVault('${m.imdbID}')">+ Watchlist</button>
-                    <a href="${ytUrl}" target="_blank" class="overlay-btn btn-trailer" onclick="event.stopPropagation()">▶ Trailer</a>
+                    <div class="search-btn-group">
+                        <button class="overlay-btn btn-add" onclick="event.stopPropagation(); addToVault('${m.imdbID}')">+ List</button>
+                        <a href="${ytUrl}" target="_blank" class="overlay-btn btn-trailer" onclick="event.stopPropagation()">▶ Trailer</a>
+                    </div>
                 </div>`;
             div.onclick = () => showDetails(m.imdbID);
             resultsDiv.appendChild(div);
@@ -52,19 +57,74 @@ async function liveSearch(query) {
     }
 }
 
+// --- DATABASE & RENDER ---
+async function fetchMovies() {
+    let { data, error } = await _supabase.from('movies').select('*');
+    if (error) return;
+
+    data.sort((a, b) => {
+        if (currentSort === 'title') return a.title.localeCompare(b.title);
+        if (currentSort === 'year') return parseInt(b.year) - parseInt(a.year);
+        if (currentSort === 'rating') return parseFloat(b.rating) - parseFloat(a.rating);
+    });
+    render(data);
+}
+
+function setSort(type) {
+    currentSort = type;
+    document.querySelectorAll('.sort-btn').forEach(btn => btn.classList.remove('active'));
+    if(type === 'title') document.getElementById('sortAlpha').classList.add('active');
+    if(type === 'year') document.getElementById('sortYear').classList.add('active');
+    if(type === 'rating') document.getElementById('sortRating').classList.add('active');
+    fetchMovies();
+}
+
+function render(movies) {
+    const want = document.getElementById('wantList'); 
+    const watched = document.getElementById('watchedList');
+    want.innerHTML = ''; 
+    watched.innerHTML = '';
+    
+    movies.forEach(m => {
+        const isW = m.status === 'watched';
+        const html = `
+            <div class="movie-card">
+                <button class="remove-btn" onclick="deleteMovie('${m.imdb_id}')">✕</button>
+                <div class="poster-wrapper" onclick="showDetails('${m.imdb_id}')">
+                    <img class="card-poster" src="${m.poster}" alt="${m.title}">
+                </div>
+                <div class="card-content">
+                    <div class="movie-title" onclick="showDetails('${m.imdb_id}')">${m.title}</div>
+                    <div class="genre-tag">${m.genre || 'Film'}</div>
+                    <div class="runtime-text">${m.runtime || ''}</div>
+                    <div style="display:flex; justify-content:space-between; font-size:0.75rem; color:#94a3b8;">
+                        <span>${m.year}</span><span style="color:#fbbf24;">⭐ ${m.rating}</span>
+                    </div>
+                </div>
+            </div>`;
+        isW ? watched.innerHTML += html : want.innerHTML += html;
+    });
+}
+
+// --- HELPERS ---
 async function addToVault(id) {
     const res = await fetch(`https://www.omdbapi.com/?i=${id}&apikey=${API_KEY}`);
     const d = await res.json();
-    const movie = { imdb_id: d.imdbID, title: d.Title, poster: d.Poster, year: d.Year, runtime: d.Runtime, rating: d.imdbRating, director: d.Director, genre: d.Genre, status: 'want', my_stars: 0 };
-    const { error } = await _supabase.from('movies').upsert([movie], { onConflict: 'imdb_id' });
-    if (!error) { notify(`Added!`, '#22c55e'); fetchMovies(); }
+    const movie = { 
+        imdb_id: d.imdbID, title: d.Title, poster: d.Poster, 
+        year: d.Year, runtime: d.Runtime, rating: d.imdbRating, 
+        genre: d.Genre, status: 'want' 
+    };
+    await _supabase.from('movies').upsert([movie]);
+    fetchMovies(); notify("Added!", "#22c55e");
 }
 
 async function showDetails(id) {
     const modal = document.getElementById('detailsModal');
     const content = document.getElementById('modalData');
     modal.style.display = 'flex';
-    content.innerHTML = '<div style="text-align:center; width:100%; padding:40px;"><div class="skeleton" style="height:300px; width:180px;"></div></div>';
+    content.innerHTML = '<div style="text-align:center; width:100%; padding:40px;"><div class="skeleton" style="height:350px; width:240px; border-radius:20px;"></div></div>';
+    
     const { data: local } = await _supabase.from('movies').select('*').eq('imdb_id', id).single();
     const res = await fetch(`https://www.omdbapi.com/?i=${id}&apikey=${API_KEY}&plot=short`);
     const d = await res.json();
@@ -75,10 +135,26 @@ async function showDetails(id) {
         <div class="modal-body">
             <img src="${d.Poster}" class="modal-poster">
             <div style="flex:1;">
-                <h2 style="border:none; padding:0; font-size:1.6rem; color:white; margin:0 0 10px 0;">${d.Title}</h2>
-                <div style="color:var(--accent); font-weight:bold; margin-bottom:15px;">${d.Year} • ${d.Runtime} • ⭐ ${d.imdbRating}</div>
-                <div class="genre-tag" style="background:rgba(255,255,255,0.05); color:white; margin-bottom:15px;">${d.Genre}</div>
-                <p style="color:#cbd5e1; font-size:0.95rem; line-height:1.6;">${d.Plot}</p>
+                <h2 style="border:none; padding:0; font-size:1.8rem; color:white; margin:0 0 10px 0;">${d.Title}</h2>
+                <div style="color:var(--accent); font-weight:bold; margin-bottom:18px; font-size:0.9rem;">${d.Year} • ${d.Runtime} • ⭐ ${d.imdbRating}</div>
+                
+                <div class="modal-info-label">Plot Summary</div>
+                <div class="modal-info-value">${d.Plot}</div>
+                
+                <div style="display:flex; gap:30px;">
+                    <div>
+                        <div class="modal-info-label">Director</div>
+                        <div class="modal-info-value">${d.Director}</div>
+                    </div>
+                    <div>
+                        <div class="modal-info-label">Genre</div>
+                        <div class="modal-info-value">${d.Genre}</div>
+                    </div>
+                </div>
+
+                <div class="modal-info-label">Cast</div>
+                <div class="modal-info-value">${d.Actors}</div>
+
                 <div class="btn-group">
                     ${!isWatched ? `<button onclick="updateStatus('${id}', 'watched')" class="modal-btn btn-watched">✅ Watched</button>` : ''}
                     <a href="https://www.imdb.com/title/${id}/" target="_blank" class="modal-btn btn-imdb">IMDb</a>
@@ -90,44 +166,16 @@ async function showDetails(id) {
 
 async function updateStatus(id, newStatus) {
     await _supabase.from('movies').update({status: newStatus}).eq('imdb_id', id);
-    closeModal(); fetchMovies(); notify(`Archived!`, '#22c55e');
+    closeModal(); fetchMovies(); notify("Archived!", "#22c55e");
+}
+
+function notify(text, color) {
+    const m = document.getElementById('msg');
+    m.innerText = text; m.style.backgroundColor = color;
+    m.style.display = 'block'; setTimeout(() => m.style.display = 'none', 2500);
 }
 
 function closeModal() { document.getElementById('detailsModal').style.display = 'none'; }
-async function fetchMovies() { const { data } = await _supabase.from('movies').select('*'); if (data) render(data); }
 async function deleteMovie(id) { if(confirm("Remove?")) { await _supabase.from('movies').delete().eq('imdb_id', id); fetchMovies(); } }
-
-function render(movies) {
-    const want = document.getElementById('wantList'); const watched = document.getElementById('watchedList');
-    want.innerHTML = ''; watched.innerHTML = '';
-    movies.forEach(m => {
-        const isW = m.status === 'watched';
-        const html = `<div class="movie-card">
-            <button class="remove-btn" onclick="deleteMovie('${m.imdb_id}')">✕</button>
-            <div class="poster-wrapper" onclick="showDetails('${m.imdb_id}')"><img class="card-poster" src="${m.poster}"></div>
-            <div class="card-content">
-                <div class="movie-title" onclick="showDetails('${m.imdb_id}')">${m.title}</div>
-                <div class="genre-tag">${m.genre || 'Film'}</div>
-                <div class="runtime-text">${m.runtime || ''}</div>
-                <div style="display:flex; justify-content:space-between; font-size:0.75rem; color:#94a3b8;">
-                    <span>${m.year}</span><span style="color:#fbbf24;">⭐ ${m.rating}</span>
-                </div>
-                ${isW ? renderStars(m) : ''}
-            </div>
-        </div>`;
-        isW ? watched.innerHTML += html : want.innerHTML += html;
-    });
-}
-
-function renderStars(m) {
-    let h = '<div class="stars">';
-    for (let i = 1; i <= 5; i++) h += `<span onclick="updateMovieStar('${m.imdb_id}', ${i})" style="cursor:pointer">${i <= m.my_stars ? '★' : '☆'}</span>`;
-    return h + '</div>';
-}
-
-async function updateMovieStar(id, stars) {
-    await _supabase.from('movies').update({my_stars: stars}).eq('imdb_id', id);
-    fetchMovies();
-}
 
 fetchMovies();

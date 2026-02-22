@@ -19,6 +19,7 @@
         <div class="search-outer-wrapper">
             <div class="search-container">
                 <input type="text" id="movieInput" placeholder="Find a movie to add..." autocomplete="off">
+                <button id="clearSearch">✕</button>
                 <div id="searchResults"></div>
             </div>
         </div>
@@ -27,7 +28,14 @@
 
         <div class="lists-container">
             <section id="watchlist">
-                <h2>⏳ Watchlist</h2>
+                <div class="section-header">
+                    <h2>⏳ Watchlist</h2>
+                    <div class="sort-container">
+                        <button class="sort-btn active" id="sortAlpha" onclick="setSort('title')">A-Z</button>
+                        <button class="sort-btn" id="sortYear" onclick="setSort('year')">Year</button>
+                        <button class="sort-btn" id="sortRating" onclick="setSort('rating')">Rating</button>
+                    </div>
+                </div>
                 <div id="wantList" class="movie-grid"></div>
             </section>
             
