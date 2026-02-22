@@ -106,10 +106,24 @@ input {
 .genre-tag { font-size: 0.65rem; color: var(--accent); background: rgba(56, 189, 248, 0.1); padding: 2px 8px; border-radius: 4px; display: inline-block; margin-bottom: 8px; }
 .runtime-text { font-size: 0.7rem; color: #64748b; margin-bottom: 5px; }
 
-/* Modals & Ghost Buttons */
-#detailsModal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 2000; backdrop-filter: blur(12px); justify-content: center; align-items: center; padding: 20px; }
-.modal-content { background: #111827; max-width: 800px; width: 100%; border-radius: 32px; padding: 40px; border: 1px solid rgba(255,255,255,0.08); position: relative; box-shadow: 0 40px 100px rgba(0,0,0,0.8); }
-.modal-body { display: flex; gap: 35px; }
+/* Skeleton */
+@keyframes fbShimmer { 0% { background-position: -800px 0 } 100% { background-position: 800px 0 } }
+.skeleton {
+    background: #1e293b; background-image: linear-gradient(to right, #1e293b 0%, #334155 20%, #1e293b 40%, #1e293b 100%);
+    background-repeat: no-repeat; background-size: 800px 100%; animation: fbShimmer 1.2s linear infinite forwards;
+}
+
+/* Modals & Mobile Fixes */
+#detailsModal { 
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 2000; 
+    backdrop-filter: blur(12px); justify-content: center; align-items: center; padding: 15px; 
+}
+.modal-content { 
+    background: #111827; max-width: 800px; width: 100%; border-radius: 32px; 
+    padding: 25px; border: 1px solid rgba(255,255,255,0.08); position: relative; 
+    box-shadow: 0 40px 100px rgba(0,0,0,0.8); max-height: 95vh; overflow-y: auto; 
+}
+.modal-body { display: flex; gap: 30px; }
 .modal-poster { width: 240px; border-radius: 20px; object-fit: cover; box-shadow: 0 20px 40px rgba(0,0,0,0.4); }
 
 .modal-info-label { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 1px; color: #6b7280; margin-bottom: 4px; font-weight: 800; }
@@ -117,20 +131,10 @@ input {
 
 .btn-group { display: flex; gap: 12px; margin-top: 30px; }
 .modal-btn { 
-    flex: 1;
-    padding: 12px 20px; 
-    border-radius: 12px; 
-    font-weight: 700; 
-    text-decoration: none; 
-    font-size: 0.8rem; 
-    cursor: pointer; 
-    display: flex; 
-    align-items: center; 
-    justify-content: center;
-    transition: 0.3s ease;
-    border: 1px solid rgba(255,255,255,0.1);
-    background: rgba(255,255,255,0.03);
-    color: #fff;
+    flex: 1; padding: 12px 20px; border-radius: 12px; font-weight: 700; text-decoration: none; 
+    font-size: 0.8rem; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    transition: 0.3s ease; border: 1px solid rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.03); color: #fff;
 }
 .modal-btn:hover { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.3); transform: translateY(-2px); }
 
@@ -142,6 +146,10 @@ input {
 #msg { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); padding: 12px 24px; border-radius: 50px; z-index: 3000; display: none; color: white; font-weight: bold; }
 
 @media (max-width: 700px) {
-    .modal-body { flex-direction: column; align-items: center; text-align: center; }
-    .btn-group { flex-direction: column; width: 100%; }
+    .modal-content { padding: 20px; border-radius: 24px; }
+    .modal-body { flex-direction: column; align-items: center; text-align: center; gap: 15px; }
+    .modal-poster { width: 160px; border-radius: 12px; }
+    .btn-group { flex-direction: column; width: 100%; margin-top: 15px; gap: 8px; }
+    .modal-btn { width: 100%; padding: 10px 15px; font-size: 0.75rem; }
+    .modal-info-value { font-size: 0.85rem; margin-bottom: 10px; }
 }

@@ -110,11 +110,7 @@ function render(movies) {
 async function addToVault(id) {
     const res = await fetch(`https://www.omdbapi.com/?i=${id}&apikey=${API_KEY}`);
     const d = await res.json();
-    const movie = { 
-        imdb_id: d.imdbID, title: d.Title, poster: d.Poster, 
-        year: d.Year, runtime: d.Runtime, rating: d.imdbRating, 
-        genre: d.Genre, status: 'want' 
-    };
+    const movie = { imdb_id: d.imdbID, title: d.Title, poster: d.Poster, year: d.Year, runtime: d.Runtime, rating: d.imdbRating, genre: d.Genre, status: 'want' };
     await _supabase.from('movies').upsert([movie]);
     fetchMovies(); notify("Added!", "#22c55e");
 }
@@ -123,7 +119,7 @@ async function showDetails(id) {
     const modal = document.getElementById('detailsModal');
     const content = document.getElementById('modalData');
     modal.style.display = 'flex';
-    content.innerHTML = '<div style="text-align:center; width:100%; padding:40px;"><div class="skeleton" style="height:350px; width:240px; border-radius:20px;"></div></div>';
+    content.innerHTML = '<div style="text-align:center; width:100%; padding:20px;"><div class="skeleton" style="height:200px; width:140px; border-radius:12px; margin: 0 auto;"></div></div>';
     
     const { data: local } = await _supabase.from('movies').select('*').eq('imdb_id', id).single();
     const res = await fetch(`https://www.omdbapi.com/?i=${id}&apikey=${API_KEY}&plot=short`);
@@ -134,14 +130,14 @@ async function showDetails(id) {
     content.innerHTML = `
         <div class="modal-body">
             <img src="${d.Poster}" class="modal-poster">
-            <div style="flex:1;">
-                <h2 style="border:none; padding:0; font-size:1.8rem; color:white; margin:0 0 10px 0;">${d.Title}</h2>
-                <div style="color:var(--accent); font-weight:bold; margin-bottom:18px; font-size:0.9rem;">${d.Year} • ${d.Runtime} • ⭐ ${d.imdbRating}</div>
+            <div style="flex:1; width: 100%;">
+                <h2 style="border:none; padding:0; font-size:1.6rem; color:white; margin:0 0 5px 0;">${d.Title}</h2>
+                <div style="color:var(--accent); font-weight:bold; margin-bottom:12px; font-size:0.85rem;">${d.Year} • ${d.Runtime} • ⭐ ${d.imdbRating}</div>
                 
                 <div class="modal-info-label">Plot Summary</div>
                 <div class="modal-info-value">${d.Plot}</div>
                 
-                <div style="display:flex; gap:30px;">
+                <div style="display:flex; gap:20px; justify-content: center; flex-wrap: wrap;">
                     <div>
                         <div class="modal-info-label">Director</div>
                         <div class="modal-info-value">${d.Director}</div>
@@ -153,7 +149,7 @@ async function showDetails(id) {
                 </div>
 
                 <div class="modal-info-label">Cast</div>
-                <div class="modal-info-value">${d.Actors}</div>
+                <div class="modal-info-value" style="margin-bottom: 5px;">${d.Actors}</div>
 
                 <div class="btn-group">
                     ${!isWatched ? `<button onclick="updateStatus('${id}', 'watched')" class="modal-btn btn-watched">✅ Watched</button>` : ''}
