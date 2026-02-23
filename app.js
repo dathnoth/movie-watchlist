@@ -8,7 +8,7 @@ let debounceTimer;
 let currentSort = 'title';
 
 // --- AUTH LOGIC ---
-const VAULT_PIN = '1234'; // Change this to your preferred PIN
+const VAULT_PIN = '1234'; 
 
 function checkPin() {
     const input = document.getElementById('pinInput').value;
@@ -23,7 +23,6 @@ function checkPin() {
     }
 }
 
-// Auto-unlock if session is less than 24 hours old
 window.onload = () => {
     const lastAuth = localStorage.getItem('vault_auth');
     if (lastAuth && (Date.now() - lastAuth < 86400000)) {
@@ -92,6 +91,11 @@ async function fetchMovies() {
         if (currentSort === 'title') return a.title.localeCompare(b.title);
         if (currentSort === 'year') return parseInt(b.year) - parseInt(a.year);
         if (currentSort === 'rating') return parseFloat(b.rating) - parseFloat(a.rating);
+        if (currentSort === 'runtime') {
+            const timeA = parseInt(a.runtime) || 0;
+            const timeB = parseInt(b.runtime) || 0;
+            return timeB - timeA; // Longest first
+        }
     });
     render(data);
 }
@@ -102,6 +106,7 @@ function setSort(type) {
     if(type === 'title') document.getElementById('sortAlpha').classList.add('active');
     if(type === 'year') document.getElementById('sortYear').classList.add('active');
     if(type === 'rating') document.getElementById('sortRating').classList.add('active');
+    if(type === 'runtime') document.getElementById('sortRuntime').classList.add('active');
     fetchMovies();
 }
 
@@ -211,5 +216,3 @@ function notify(text, color) {
 
 function closeModal() { document.getElementById('detailsModal').style.display = 'none'; }
 async function deleteMovie(id) { if(confirm("Remove?")) { await _supabase.from('movies').delete().eq('imdb_id', id); fetchMovies(); } }
-
-// Removed fetchMovies() from bottom to prevent background loading before auth
