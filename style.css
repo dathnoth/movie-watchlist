@@ -15,6 +15,22 @@ body {
     overflow-x: hidden;
 }
 
+/* Auth Overlay */
+#authOverlay {
+    position: fixed; inset: 0; background: var(--bg); z-index: 5000;
+    display: flex; justify-content: center; align-items: center; padding: 20px;
+}
+.auth-card {
+    background: #0f172a; padding: 40px; border-radius: 28px;
+    border: 1px solid rgba(255,255,255,0.08); text-align: center;
+    max-width: 320px; width: 100%; box-shadow: 0 40px 100px rgba(0,0,0,0.8);
+}
+#pinInput {
+    letter-spacing: 15px; text-align: center; font-size: 1.5rem; padding: 15px;
+    background: rgba(0,0,0,0.2); border: 1px solid var(--accent); color: white;
+    border-radius: 12px; width: 100%; box-sizing: border-box;
+}
+
 .app-container { max-width: 1200px; margin: 0 auto; padding: 20px; box-sizing: border-box; }
 .header-area { display: flex; justify-content: center; align-items: center; margin-bottom: 1.5rem; padding-top: 10px; }
 h1 { font-size: 1.8rem; font-weight: 900; margin: 0; letter-spacing: -1px; }
@@ -106,6 +122,14 @@ input {
 .genre-tag { font-size: 0.65rem; color: var(--accent); background: rgba(56, 189, 248, 0.1); padding: 2px 8px; border-radius: 4px; display: inline-block; margin-bottom: 8px; }
 .runtime-text { font-size: 0.7rem; color: #64748b; margin-bottom: 5px; }
 
+/* Skeleton */
+@keyframes fbShimmer { 0% { background-position: -800px 0 } 100% { background-position: 800px 0 } }
+.skeleton {
+    background: #1e293b; background-image: linear-gradient(to right, #1e293b 0%, #334155 20%, #1e293b 40%, #1e293b 100%);
+    background-repeat: no-repeat; background-size: 800px 100%; animation: fbShimmer 1.2s linear infinite forwards;
+    border-radius: 4px;
+}
+
 /* Modals */
 #detailsModal { 
     display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 2000; 
@@ -116,11 +140,20 @@ input {
     padding: 30px; border: 1px solid rgba(255,255,255,0.08); position: relative; 
     box-shadow: 0 40px 100px rgba(0,0,0,0.8); max-height: 90vh; overflow-y: auto; 
 }
-.modal-body { display: flex; gap: 30px; }
+.modal-body { display: flex; gap: 30px; text-align: left; }
 .modal-poster { width: 220px; border-radius: 16px; object-fit: cover; box-shadow: 0 10px 30px rgba(0,0,0,0.4); flex-shrink: 0; }
+
+.modal-close { 
+    position: absolute; top: 20px; right: 20px;
+    font-size: 1.5rem; cursor: pointer; color: #64748b; transition: color 0.2s; 
+    z-index: 2001; border: none; background: none;
+}
+.modal-close:hover { color: var(--accent); }
 
 .modal-info-label { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 1px; color: #64748b; margin-bottom: 2px; font-weight: 800; }
 .modal-info-value { font-size: 0.85rem; color: #cbd5e1; margin-bottom: 12px; line-height: 1.4; }
+
+.info-row { display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 5px; justify-content: flex-start; }
 
 .btn-group { display: flex; gap: 10px; margin-top: 25px; }
 .modal-btn { 
@@ -138,18 +171,19 @@ input {
 .remove-btn { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.6); width: 22px; height: 22px; border-radius: 50%; color: #ef4444; border: none; cursor: pointer; z-index: 10; font-size: 9px; }
 #msg { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); padding: 12px 24px; border-radius: 50px; z-index: 3000; display: none; color: white; font-weight: bold; }
 
-/* MOBILE MODAL OVERRIDES */
 @media (max-width: 650px) {
-    .modal-content { padding: 20px; border-radius: 20px; }
+    .modal-content { padding: 25px 20px 20px 20px; border-radius: 20px; }
+    .modal-close { top: 15px; right: 15px; font-size: 1.2rem; }
     .modal-body { 
         flex-direction: column; 
         align-items: center; 
-        text-align: center; /* CENTER ALIGN NAMES ON MOBILE */
+        text-align: center; 
         gap: 15px; 
     }
     .modal-poster { width: 130px; border-radius: 10px; }
+    .info-row { justify-content: center; }
     .btn-group { flex-direction: row; width: 100%; margin-top: 20px; gap: 6px; }
     .modal-btn { padding: 10px 5px; font-size: 0.7rem; }
     .modal-info-value { font-size: 0.8rem; margin-bottom: 8px; }
-    h2 { font-size: 1.3rem !important; margin-bottom: 2px !important; }
+    h2 { font-size: 1.3rem !important; margin-bottom: 2px !important; padding-right: 0 !important; }
 }

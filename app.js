@@ -7,6 +7,32 @@ const _supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 let debounceTimer;
 let currentSort = 'title';
 
+// --- AUTH LOGIC ---
+const VAULT_PIN = '1234'; // Change this to your preferred PIN
+
+function checkPin() {
+    const input = document.getElementById('pinInput').value;
+    if (input === VAULT_PIN) {
+        document.getElementById('authOverlay').style.display = 'none';
+        document.getElementById('mainApp').style.display = 'block';
+        localStorage.setItem('vault_auth', Date.now());
+        fetchMovies();
+    } else {
+        alert("Incorrect PIN");
+        document.getElementById('pinInput').value = '';
+    }
+}
+
+// Auto-unlock if session is less than 24 hours old
+window.onload = () => {
+    const lastAuth = localStorage.getItem('vault_auth');
+    if (lastAuth && (Date.now() - lastAuth < 86400000)) {
+        document.getElementById('authOverlay').style.display = 'none';
+        document.getElementById('mainApp').style.display = 'block';
+        fetchMovies();
+    }
+};
+
 // --- SEARCH LOGIC ---
 document.getElementById('movieInput').addEventListener('input', (e) => {
     const clearBtn = document.getElementById('clearSearch');
@@ -119,7 +145,23 @@ async function showDetails(id) {
     const modal = document.getElementById('detailsModal');
     const content = document.getElementById('modalData');
     modal.style.display = 'flex';
-    content.innerHTML = '<div style="text-align:center; width:100%; padding:20px;"><div class="skeleton" style="height:180px; width:120px; border-radius:12px; margin: 0 auto;"></div></div>';
+
+    content.innerHTML = `
+        <div class="modal-body">
+            <div class="skeleton" style="width:220px; height:330px; border-radius:16px; flex-shrink:0;"></div>
+            <div style="flex:1; width:100%;">
+                <div class="skeleton" style="width:70%; height:30px; margin-bottom:15px;"></div>
+                <div class="skeleton" style="width:40%; height:20px; margin-bottom:25px;"></div>
+                <div class="skeleton" style="width:100%; height:15px; margin-bottom:8px;"></div>
+                <div class="skeleton" style="width:100%; height:15px; margin-bottom:8px;"></div>
+                <div class="skeleton" style="width:60%; height:15px; margin-bottom:25px;"></div>
+                <div style="display:flex; gap:10px;">
+                    <div class="skeleton" style="flex:1; height:45px; border-radius:12px;"></div>
+                    <div class="skeleton" style="flex:1; height:45px; border-radius:12px;"></div>
+                    <div class="skeleton" style="flex:1; height:45px; border-radius:12px;"></div>
+                </div>
+            </div>
+        </div>`;
     
     const { data: local } = await _supabase.from('movies').select('*').eq('imdb_id', id).single();
     const res = await fetch(`https://www.omdbapi.com/?i=${id}&apikey=${API_KEY}&plot=short`);
@@ -131,13 +173,13 @@ async function showDetails(id) {
         <div class="modal-body">
             <img src="${d.Poster}" class="modal-poster">
             <div style="flex:1; width: 100%;">
-                <h2 style="border:none; padding:0; font-size:1.5rem; color:white; margin:0 0 5px 0;">${d.Title}</h2>
+                <h2 style="border:none; padding:0; font-size:1.5rem; color:white; margin:0 0 5px 0; padding-right: 30px;">${d.Title}</h2>
                 <div style="color:var(--accent); font-weight:bold; margin-bottom:12px; font-size:0.8rem;">${d.Year} • ${d.Runtime} • ⭐ ${d.imdbRating}</div>
                 
                 <div class="modal-info-label">Plot Summary</div>
                 <div class="modal-info-value">${d.Plot}</div>
                 
-                <div style="display:flex; gap:20px; flex-wrap: wrap; margin-bottom: 5px; justify-content: center;">
+                <div class="info-row">
                     <div>
                         <div class="modal-info-label">Director</div>
                         <div class="modal-info-value">${d.Director}</div>
@@ -170,4 +212,4 @@ function notify(text, color) {
 function closeModal() { document.getElementById('detailsModal').style.display = 'none'; }
 async function deleteMovie(id) { if(confirm("Remove?")) { await _supabase.from('movies').delete().eq('imdb_id', id); fetchMovies(); } }
 
-fetchMovies();
+// Removed fetchMovies() from bottom to prevent background loading before auth

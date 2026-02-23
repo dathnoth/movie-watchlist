@@ -3,53 +3,62 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>CineVault // Daniel</title>
+    <title>MovieVault // Daniel</title>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#38bdf8">
-    
     <link rel="stylesheet" href="style.css">
-    
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
-    <div class="app-container">
-        <div class="header-area"><h1>CINE<span>VAULT</span></h1></div>
-
-        <div class="search-outer-wrapper">
-            <div class="search-container">
-                <input type="text" id="movieInput" placeholder="Find a movie to add..." autocomplete="off">
-                <button id="clearSearch">✕</button>
-                <div id="searchResults"></div>
-            </div>
-        </div>
-
-        <div id="msg"></div>
-
-        <div class="lists-container">
-            <section id="watchlist">
-                <div class="section-header">
-                    <h2>⏳ Watchlist</h2>
-                    <div class="sort-container">
-                        <button class="sort-btn active" id="sortAlpha" onclick="setSort('title')">A-Z</button>
-                        <button class="sort-btn" id="sortYear" onclick="setSort('year')">Year</button>
-                        <button class="sort-btn" id="sortRating" onclick="setSort('rating')">Rating</button>
-                    </div>
-                </div>
-                <div id="wantList" class="movie-grid"></div>
-            </section>
-            
-            <section id="archive">
-                <h2>✅ Watched Archive</h2>
-                <div id="watchedList" class="movie-grid archive-grid"></div>
-            </section>
+    <div id="authOverlay">
+        <div class="auth-card">
+            <div class="header-area"><h1>MOVIE<span>VAULT</span></h1></div>
+            <p style="font-size: 0.8rem; color: #64748b; margin-bottom: 20px;">Secure Entry Required</p>
+            <input type="password" id="pinInput" placeholder="Enter PIN" maxlength="4" pattern="\d*" inputmode="numeric">
+            <button onclick="checkPin()" class="modal-btn btn-imdb" style="margin-top: 15px; width: 100%;">Unlock</button>
         </div>
     </div>
 
-    <div id="detailsModal" onclick="closeModal()">
-        <div class="modal-content" onclick="event.stopPropagation()">
-            <span class="modal-close" onclick="closeModal()">✕</span>
-            <div id="modalData"></div>
+    <div id="mainApp" style="display: none;">
+        <div class="app-container">
+            <div class="header-area"><h1>MOVIE<span>VAULT</span></h1></div>
+
+            <div class="search-outer-wrapper">
+                <div class="search-container">
+                    <input type="text" id="movieInput" placeholder="Find a movie to add..." autocomplete="off">
+                    <button id="clearSearch">✕</button>
+                    <div id="searchResults"></div>
+                </div>
+            </div>
+
+            <div id="msg"></div>
+
+            <div class="lists-container">
+                <section id="watchlist">
+                    <div class="section-header">
+                        <h2>⏳ Watchlist</h2>
+                        <div class="sort-container">
+                            <button class="sort-btn active" id="sortAlpha" onclick="setSort('title')">A-Z</button>
+                            <button class="sort-btn" id="sortYear" onclick="setSort('year')">Year</button>
+                            <button class="sort-btn" id="sortRating" onclick="setSort('rating')">Rating</button>
+                        </div>
+                    </div>
+                    <div id="wantList" class="movie-grid"></div>
+                </section>
+                
+                <section id="archive">
+                    <h2>✅ Watched Archive</h2>
+                    <div id="watchedList" class="movie-grid archive-grid"></div>
+                </section>
+            </div>
+        </div>
+
+        <div id="detailsModal" onclick="closeModal()">
+            <div class="modal-content" onclick="event.stopPropagation()">
+                <button class="modal-close" onclick="closeModal()">✕</button>
+                <div id="modalData"></div>
+            </div>
         </div>
     </div>
 
