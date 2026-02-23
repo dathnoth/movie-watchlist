@@ -21,21 +21,21 @@
     </div>
 
     <div id="mainApp" style="display: none;">
-        <div class="app-container">
-            <div class="header-area"><h1>MOVIE<span>VAULT</span></h1></div>
+        <div class="header-area"><h1>MOVIE<span>VAULT</span></h1></div>
 
-            <div class="search-outer-wrapper">
-                <div class="search-container">
-                    <input type="text" id="movieInput" placeholder="Find a movie to add..." autocomplete="off">
-                    <button id="clearSearch">✕</button>
-                    <div id="searchResults"></div>
-                </div>
+        <div class="search-outer-wrapper">
+            <div class="search-container">
+                <input type="text" id="movieInput" placeholder="Find a movie to add..." autocomplete="off">
+                <button id="clearSearch">✕</button>
+                <div id="searchResults"></div>
             </div>
+        </div>
 
-            <div id="msg"></div>
+        <div id="msg"></div>
 
-            <div class="lists-container">
-                <section id="watchlist">
+        <div class="lists-container">
+            <section id="watchlist" class="section-watchlist">
+                <div class="content-wrapper">
                     <div class="section-header">
                         <h2>WATCHLIST</h2>
                         <div class="sort-container">
@@ -46,13 +46,17 @@
                         </div>
                     </div>
                     <div id="wantList" class="movie-grid"></div>
-                </section>
-                
-                <section id="archive">
-                    <h2>ARCHIVE</h2>
+                </div>
+            </section>
+            
+            <section id="archive" class="section-archive">
+                <div class="content-wrapper">
+                    <div class="section-header">
+                        <h2>ARCHIVE</h2>
+                    </div>
                     <div id="watchedList" class="movie-grid archive-grid"></div>
-                </section>
-            </div>
+                </div>
+            </section>
         </div>
 
         <div id="detailsModal" onclick="closeModal()">
