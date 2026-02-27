@@ -1,26 +1,19 @@
-const API_KEY = '443ae32b';
+// URLs are fine to stay public, but sensitive keys are now handled via Proxy or RLS
 const SUPABASE_URL = 'https://xsranuxnftbpuzciyiia.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhzcmFudXhuZnRicHV6Y2l5aWlhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE2ODg2MzEsImV4cCI6MjA4NzI2NDYzMX0.aFrjE_wenjQ0cGE0wXDZEdqb4tptfOJ70AFZRDu0yfc';
 const { createClient } = supabase;
-const _supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let debounceTimer;
 let currentSort = 'title';
 let cachedMovies = [];
 const VAULT_PIN = '0234'; 
 
-function checkPin() {
-    const input = document.getElementById('pinInput').value;
-    if (input === VAULT_PIN) {
-        document.getElementById('authOverlay').style.display = 'none';
-        document.getElementById('mainApp').style.display = 'block';
-        localStorage.setItem('vault_auth', Date.now());
-        fetchMovies();
-    } else { 
-        alert("Incorrect PIN"); 
-        document.getElementById('pinInput').value = '';
+// Initialize Supabase with the x-vault-pin header for RLS Security
+const _supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
+    global: {
+        headers: { 'x-vault-pin': VAULT_PIN }
     }
-}
+});
 
 window.onload = () => {
     const lastAuth = localStorage.getItem('vault_auth');
@@ -52,8 +45,9 @@ document.getElementById('movieInput').addEventListener('input', (e) => {
     debounceTimer = setTimeout(() => liveSearch(q), 300);
 });
 
+// Proxy Call: Search movies via Cloudflare Function
 async function liveSearch(query) {
-    const res = await fetch(`https://www.omdbapi.com/?s=${encodeURIComponent(query)}&apikey=${API_KEY}`);
+    const res = await fetch(`/api?type=search&q=${encodeURIComponent(query)}`);
     const data = await res.json();
     const resultsDiv = document.getElementById('searchResults');
     resultsDiv.innerHTML = '';
@@ -77,7 +71,6 @@ async function fetchMovies() {
     data.sort((a, b) => {
         if (currentSort === 'title') return a.title.localeCompare(b.title);
         if (currentSort === 'year') {
-            // Updated: Chronological Sort by Full Date
             const dateA = new Date(a.year).getTime() || 0;
             const dateB = new Date(b.year).getTime() || 0;
             return dateB - dateA;
@@ -134,36 +127,38 @@ function pickRandomMovie() {
     }, 600);
 }
 
+// Proxy Call: Get movie details via Cloudflare Function to add to DB
 async function addToVault(id) {
     const card = document.getElementById(`search-${id}`);
     if (card) card.classList.add('added-state');
     
-    // Updated: Fetching full 'Released' date instead of just 'Year'
-    const res = await fetch(`https://www.omdbapi.com/?i=${id}&apikey=${API_KEY}`);
+    const res = await fetch(`/api?type=detail&id=${id}`);
     const d = await res.json();
     
     await _supabase.from('movies').upsert([{ 
         imdb_id: d.imdbID, 
         title: d.Title, 
         poster: d.Poster, 
-        year: d.Released, // Storing full date here
+        year: d.Released, 
         runtime: d.Runtime, 
         rating: d.imdbRating, 
         genre: d.Genre, 
         status: 'want' 
     }]);
-
+    
     setTimeout(() => {
         document.getElementById('searchResults').classList.remove('active');
         fetchMovies();
     }, 600);
 }
 
+// Proxy Call: Get movie details via Cloudflare Function for Modal
 async function showDetails(id) {
     const modal = document.getElementById('detailsModal');
     const content = document.getElementById('modalData');
     modal.style.display = 'flex';
     document.body.classList.add('modal-open');
+    
     content.innerHTML = `
         <div class="modal-body">
             <div class="skeleton-shimmer" style="width:200px; height:300px; border-radius:16px; flex-shrink:0;"></div>
@@ -178,11 +173,15 @@ async function showDetails(id) {
                 </div>
             </div>
         </div>`;
+    
     const { data: local } = await _supabase.from('movies').select('*').eq('imdb_id', id).single();
-    const res = await fetch(`https://www.omdbapi.com/?i=${id}&apikey=${API_KEY}&plot=short`);
+    
+    const res = await fetch(`/api?type=detail&id=${id}`);
     const d = await res.json();
+    
     const ytUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(d.Title + ' trailer')}`;
     const isWatched = local?.status === 'watched';
+
     content.innerHTML = `
         <div class="modal-body">
             <img src="${d.Poster}" class="modal-poster">
@@ -229,6 +228,20 @@ async function updateStatus(id, s) {
 }
 
 async function deleteMovie(id) { if(confirm("Remove?")) { await _supabase.from('movies').delete().eq('imdb_id', id); fetchMovies(); } }
+
+function checkPin() {
+    const input = document.getElementById('pinInput').value;
+    if (input === VAULT_PIN) {
+        document.getElementById('authOverlay').style.display = 'none';
+        document.getElementById('mainApp').style.display = 'block';
+        localStorage.setItem('vault_auth', Date.now());
+        fetchMovies();
+    } else { 
+        alert("Incorrect PIN"); 
+        document.getElementById('pinInput').value = '';
+    }
+}
+
 function closeModal() { 
     document.getElementById('detailsModal').style.display = 'none'; 
     document.body.classList.remove('modal-open');
