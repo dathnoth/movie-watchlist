@@ -6,6 +6,7 @@ const _supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let debounceTimer;
 let currentSort = 'title';
+let cachedMovies = [];
 const VAULT_PIN = '0234'; 
 
 function checkPin() {
@@ -30,6 +31,15 @@ window.onload = () => {
     }
 };
 
+window.addEventListener('scroll', () => {
+    const roulette = document.getElementById('rouletteWrapper');
+    if (window.scrollY > 100) {
+        roulette.classList.remove('roulette-hidden');
+    } else {
+        roulette.classList.add('roulette-hidden');
+    }
+});
+
 document.getElementById('movieInput').addEventListener('input', (e) => {
     const clearBtn = document.getElementById('clearSearch');
     const resultsDiv = document.getElementById('searchResults');
@@ -38,7 +48,7 @@ document.getElementById('movieInput').addEventListener('input', (e) => {
     const q = e.target.value;
     if (q.length < 3) { resultsDiv.classList.remove('active'); resultsDiv.innerHTML = ''; return; }
     resultsDiv.classList.add('active');
-    resultsDiv.innerHTML = Array(6).fill('<div class="movie-card skeleton" style="min-width:160px; height:240px;"></div>').join('');
+    resultsDiv.innerHTML = Array(6).fill('<div class="movie-card skeleton-shimmer" style="min-width:160px; height:240px;"></div>').join('');
     debounceTimer = setTimeout(() => liveSearch(q), 300);
 });
 
@@ -63,9 +73,15 @@ async function liveSearch(query) {
 async function fetchMovies() {
     let { data } = await _supabase.from('movies').select('*');
     if (!data) return;
+    cachedMovies = data;
     data.sort((a, b) => {
         if (currentSort === 'title') return a.title.localeCompare(b.title);
-        if (currentSort === 'year') return parseInt(b.year) - parseInt(a.year);
+        if (currentSort === 'year') {
+            // Updated: Chronological Sort by Full Date
+            const dateA = new Date(a.year).getTime() || 0;
+            const dateB = new Date(b.year).getTime() || 0;
+            return dateB - dateA;
+        }
         if (currentSort === 'rating') return parseFloat(b.rating) - parseFloat(a.rating);
         if (currentSort === 'runtime') return (parseInt(b.runtime) || 0) - (parseInt(a.runtime) || 0);
     });
@@ -81,13 +97,18 @@ function setSort(type) {
 }
 
 function render(movies) {
-    const want = document.getElementById('wantList'); const watched = document.getElementById('watchedList');
-    want.innerHTML = ''; watched.innerHTML = '';
+    const want = document.getElementById('wantList'); 
+    const watched = document.getElementById('watchedList');
+    want.innerHTML = ''; 
+    watched.innerHTML = '';
+    
     movies.forEach(m => {
         const html = `
             <div class="movie-card">
                 <button class="remove-btn" onclick="deleteMovie('${m.imdb_id}')">✕</button>
-                <div class="poster-wrapper" onclick="showDetails('${m.imdb_id}')"><img class="card-poster" src="${m.poster}"></div>
+                <div class="poster-wrapper skeleton-shimmer" onclick="showDetails('${m.imdb_id}')">
+                    <img class="card-poster" src="${m.poster}" onload="this.classList.add('loaded')">
+                </div>
                 <div class="card-content" onclick="showDetails('${m.imdb_id}')">
                     <div class="movie-title">${m.title}</div>
                     <span class="genre-tag">${m.genre}</span>
@@ -101,14 +122,37 @@ function render(movies) {
     });
 }
 
+function pickRandomMovie() {
+    const wantList = cachedMovies.filter(m => m.status === 'want');
+    if (wantList.length === 0) { alert("Add some movies to your watchlist first!"); return; }
+    const btn = document.getElementById('rouletteBtn');
+    btn.classList.add('shuffling');
+    setTimeout(() => {
+        btn.classList.remove('shuffling');
+        const random = wantList[Math.floor(Math.random() * wantList.length)];
+        showDetails(random.imdb_id);
+    }, 600);
+}
+
 async function addToVault(id) {
     const card = document.getElementById(`search-${id}`);
     if (card) card.classList.add('added-state');
     
+    // Updated: Fetching full 'Released' date instead of just 'Year'
     const res = await fetch(`https://www.omdbapi.com/?i=${id}&apikey=${API_KEY}`);
     const d = await res.json();
-    await _supabase.from('movies').upsert([{ imdb_id: d.imdbID, title: d.Title, poster: d.Poster, year: d.Year, runtime: d.Runtime, rating: d.imdbRating, genre: d.Genre, status: 'want' }]);
     
+    await _supabase.from('movies').upsert([{ 
+        imdb_id: d.imdbID, 
+        title: d.Title, 
+        poster: d.Poster, 
+        year: d.Released, // Storing full date here
+        runtime: d.Runtime, 
+        rating: d.imdbRating, 
+        genre: d.Genre, 
+        status: 'want' 
+    }]);
+
     setTimeout(() => {
         document.getElementById('searchResults').classList.remove('active');
         fetchMovies();
@@ -120,40 +164,35 @@ async function showDetails(id) {
     const content = document.getElementById('modalData');
     modal.style.display = 'flex';
     document.body.classList.add('modal-open');
-    
     content.innerHTML = `
         <div class="modal-body">
-            <div class="skeleton" style="width:200px; height:300px; border-radius:16px; flex-shrink:0;"></div>
+            <div class="skeleton-shimmer" style="width:200px; height:300px; border-radius:16px; flex-shrink:0;"></div>
             <div style="flex:1; width:100%;">
-                <div class="skeleton" style="width:80%; height:32px; margin-bottom:12px;"></div>
-                <div class="skeleton" style="width:50%; height:18px; margin-bottom:25px;"></div>
-                <div class="skeleton" style="width:100%; height:14px; margin-bottom:8px;"></div>
-                <div class="skeleton" style="width:100%; height:14px; margin-bottom:25px;"></div>
+                <div class="skeleton-shimmer" style="width:80%; height:32px; margin-bottom:12px; border-radius:4px;"></div>
+                <div class="skeleton-shimmer" style="width:50%; height:18px; margin-bottom:25px; border-radius:4px;"></div>
+                <div class="skeleton-shimmer" style="width:100%; height:14px; margin-bottom:8px;"></div>
+                <div class="skeleton-shimmer" style="width:100%; height:14px; margin-bottom:25px;"></div>
                 <div style="display:flex; gap:10px;">
-                    <div class="skeleton" style="flex:1; height:45px; border-radius:12px;"></div>
-                    <div class="skeleton" style="flex:1; height:45px; border-radius:12px;"></div>
+                    <div class="skeleton-shimmer" style="flex:1; height:45px; border-radius:12px;"></div>
+                    <div class="skeleton-shimmer" style="flex:1; height:45px; border-radius:12px;"></div>
                 </div>
             </div>
         </div>`;
-    
     const { data: local } = await _supabase.from('movies').select('*').eq('imdb_id', id).single();
     const res = await fetch(`https://www.omdbapi.com/?i=${id}&apikey=${API_KEY}&plot=short`);
     const d = await res.json();
     const ytUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(d.Title + ' trailer')}`;
     const isWatched = local?.status === 'watched';
-
     content.innerHTML = `
         <div class="modal-body">
             <img src="${d.Poster}" class="modal-poster">
             <div style="flex:1; width: 100%;">
                 <h2 style="font-size:1.7rem; color:white; margin:0 0 5px 0;">${d.Title}</h2>
                 <div style="color:var(--accent); font-weight:bold; margin-bottom:15px; font-size:0.85rem;">
-                    ${d.Year} • ${d.Runtime} • ⭐ ${d.imdbRating}
+                    ${d.Released} • ${d.Runtime} • ⭐ ${d.imdbRating}
                 </div>
-                
                 <div class="modal-info-label">Plot Summary</div>
                 <div class="modal-info-value">${d.Plot}</div>
-                
                 <div class="info-row">
                     <div>
                         <div class="modal-info-label">Director</div>
@@ -164,14 +203,12 @@ async function showDetails(id) {
                         <div class="genre-tag">${d.Genre}</div>
                     </div>
                 </div>
-
                 <div class="modal-info-label">Cast</div>
                 <div class="modal-info-value">${d.Actors}</div>
-
                 <div class="btn-group">
                     ${!isWatched ? 
-                        `<button id="action-btn-${id}" onclick="updateStatus('${id}', 'watched')" class="modal-btn btn-watched">✅ Watched</button>` : 
-                        `<button id="action-btn-${id}" onclick="updateStatus('${id}', 'want')" class="modal-btn btn-restore">🔄 Move to Watchlist</button>`
+                        `<button id="action-btn-${id}" onclick="updateStatus('${id}', 'watched')" class="modal-btn btn-watched">Watched</button>` : 
+                        `<button id="action-btn-${id}" onclick="updateStatus('${id}', 'want')" class="modal-btn btn-restore">Restore</button>`
                     }
                     <a href="https://www.imdb.com/title/${id}/" target="_blank" class="modal-btn btn-imdb">IMDb</a>
                     <a href="${ytUrl}" target="_blank" class="modal-btn btn-yt">Trailer</a>
@@ -183,17 +220,12 @@ async function showDetails(id) {
 async function updateStatus(id, s) { 
     const btn = document.getElementById(`action-btn-${id}`);
     if (btn) {
-        btn.innerText = s === 'watched' ? "✓ Archived" : "✓ Restored";
+        btn.innerText = s === 'watched' ? "Archived" : "Restored";
         btn.style.backgroundColor = s === 'watched' ? "#22c55e" : "var(--accent)";
         btn.style.color = "#000";
     }
-
     await _supabase.from('movies').update({status: s}).eq('imdb_id', id);
-    
-    setTimeout(() => {
-        closeModal(); 
-        fetchMovies(); 
-    }, 600);
+    setTimeout(() => { closeModal(); fetchMovies(); }, 600);
 }
 
 async function deleteMovie(id) { if(confirm("Remove?")) { await _supabase.from('movies').delete().eq('imdb_id', id); fetchMovies(); } }

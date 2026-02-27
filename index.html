@@ -25,7 +25,7 @@
 
         <div class="search-outer-wrapper">
             <div class="search-container">
-                <input type="text" id="movieInput" placeholder="Find a movie to add..." autocomplete="off">
+                <input type="text" id="movieInput" placeholder="Search movies" autocomplete="off">
                 <button id="clearSearch">✕</button>
             </div>
             <div class="content-wrapper">
@@ -42,7 +42,7 @@
                         <h2>WATCHLIST</h2>
                         <div class="sort-container">
                             <button class="sort-btn active" id="sortAlpha" onclick="setSort('title')">A-Z</button>
-                            <button class="sort-btn" id="sortYear" onclick="setSort('year')">Year</button>
+                            <button class="sort-btn" id="sortYear" onclick="setSort('year')">Released</button>
                             <button class="sort-btn" id="sortRating" onclick="setSort('rating')">Rating</button>
                             <button class="sort-btn" id="sortRuntime" onclick="setSort('runtime')">Runtime</button>
                         </div>
@@ -59,6 +59,13 @@
                     <div id="watchedList" class="movie-grid archive-grid"></div>
                 </div>
             </section>
+        </div>
+
+        <div id="rouletteWrapper" class="roulette-hidden">
+            <button id="rouletteBtn" onclick="pickRandomMovie()">
+                <span id="rouletteIcon">🎲</span>
+                <span id="rouletteText">Pick a movie for me</span>
+            </button>
         </div>
 
         <div id="detailsModal" onclick="closeModal()">
