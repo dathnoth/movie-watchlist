@@ -6,7 +6,7 @@ const _supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let debounceTimer;
 let currentSort = 'title';
-const VAULT_PIN = '1234'; 
+const VAULT_PIN = '0234'; 
 
 function checkPin() {
     const input = document.getElementById('pinInput').value;
@@ -15,7 +15,10 @@ function checkPin() {
         document.getElementById('mainApp').style.display = 'block';
         localStorage.setItem('vault_auth', Date.now());
         fetchMovies();
-    } else { alert("Incorrect PIN"); }
+    } else { 
+        alert("Incorrect PIN"); 
+        document.getElementById('pinInput').value = '';
+    }
 }
 
 window.onload = () => {
@@ -48,9 +51,10 @@ async function liveSearch(query) {
         data.Search.slice(0, 10).forEach(m => {
             const div = document.createElement('div');
             div.className = 'movie-card';
+            div.id = `search-${m.imdbID}`;
             div.style.minWidth = '140px';
             div.innerHTML = `<img src="${m.Poster}" style="width:100%; height:200px; object-fit:cover;"><div style="padding:10px; font-size:0.75rem; font-weight:bold;">${m.Title}</div>`;
-            div.onclick = () => { addToVault(m.imdbID); resultsDiv.classList.remove('active'); };
+            div.onclick = () => { addToVault(m.imdbID); };
             resultsDiv.appendChild(div);
         });
     }
@@ -98,10 +102,17 @@ function render(movies) {
 }
 
 async function addToVault(id) {
+    const card = document.getElementById(`search-${id}`);
+    if (card) card.classList.add('added-state');
+    
     const res = await fetch(`https://www.omdbapi.com/?i=${id}&apikey=${API_KEY}`);
     const d = await res.json();
     await _supabase.from('movies').upsert([{ imdb_id: d.imdbID, title: d.Title, poster: d.Poster, year: d.Year, runtime: d.Runtime, rating: d.imdbRating, genre: d.Genre, status: 'want' }]);
-    fetchMovies();
+    
+    setTimeout(() => {
+        document.getElementById('searchResults').classList.remove('active');
+        fetchMovies();
+    }, 600);
 }
 
 async function showDetails(id) {
@@ -158,7 +169,10 @@ async function showDetails(id) {
                 <div class="modal-info-value">${d.Actors}</div>
 
                 <div class="btn-group">
-                    ${!isWatched ? `<button onclick="updateStatus('${id}', 'watched')" class="modal-btn btn-watched">✅ Watched</button>` : ''}
+                    ${!isWatched ? 
+                        `<button id="action-btn-${id}" onclick="updateStatus('${id}', 'watched')" class="modal-btn btn-watched">✅ Watched</button>` : 
+                        `<button id="action-btn-${id}" onclick="updateStatus('${id}', 'want')" class="modal-btn btn-restore">🔄 Move to Watchlist</button>`
+                    }
                     <a href="https://www.imdb.com/title/${id}/" target="_blank" class="modal-btn btn-imdb">IMDb</a>
                     <a href="${ytUrl}" target="_blank" class="modal-btn btn-yt">Trailer</a>
                 </div>
@@ -166,7 +180,22 @@ async function showDetails(id) {
         </div>`;
 }
 
-async function updateStatus(id, s) { await _supabase.from('movies').update({status: s}).eq('imdb_id', id); closeModal(); fetchMovies(); }
+async function updateStatus(id, s) { 
+    const btn = document.getElementById(`action-btn-${id}`);
+    if (btn) {
+        btn.innerText = s === 'watched' ? "✓ Archived" : "✓ Restored";
+        btn.style.backgroundColor = s === 'watched' ? "#22c55e" : "var(--accent)";
+        btn.style.color = "#000";
+    }
+
+    await _supabase.from('movies').update({status: s}).eq('imdb_id', id);
+    
+    setTimeout(() => {
+        closeModal(); 
+        fetchMovies(); 
+    }, 600);
+}
+
 async function deleteMovie(id) { if(confirm("Remove?")) { await _supabase.from('movies').delete().eq('imdb_id', id); fetchMovies(); } }
 function closeModal() { 
     document.getElementById('detailsModal').style.display = 'none'; 

@@ -16,10 +16,8 @@ body {
     overflow-x: hidden;
 }
 
-/* Prevent background scroll when modal is open */
 body.modal-open { overflow: hidden; }
 
-/* --- THE CENTERING FIX --- */
 .content-wrapper {
     max-width: 1200px;
     margin: 0 auto;
@@ -27,7 +25,6 @@ body.modal-open { overflow: hidden; }
     box-sizing: border-box;
 }
 
-/* --- THE FACEBOOK SKELETON EFFECT --- */
 @keyframes shimmer {
     0% { background-position: -450px 0; }
     100% { background-position: 450px 0; }
@@ -43,7 +40,6 @@ body.modal-open { overflow: hidden; }
     display: inline-block;
 }
 
-/* Header & Search */
 .header-area { display: flex; justify-content: center; align-items: center; padding: 40px 0 10px 0; }
 h1 { font-size: 1.8rem; font-weight: 900; margin: 0; letter-spacing: -1px; }
 h1 span { color: var(--accent); }
@@ -53,24 +49,49 @@ h1 span { color: var(--accent); }
 input { width: 100%; padding: 18px 24px; border-radius: 20px; border: 1px solid rgba(255, 255, 255, 0.1); background: rgba(15, 23, 42, 0.95); color: white; box-sizing: border-box; font-size: 16px; backdrop-filter: blur(20px); box-shadow: 0 10px 30px rgba(0,0,0,0.5); outline: none; }
 #clearSearch { position: absolute; right: 20px; top: 50%; transform: translateY(-50%); background: none; border: none; color: #94a3b8; cursor: pointer; font-size: 1.2rem; }
 
-#searchResults { display: none; gap: 20px; overflow-x: auto; padding: 20px; background: #0b0f19; border-radius: 20px; border: 1px solid rgba(255, 255, 255, 0.1); margin-top: 10px; z-index: 1001; }
+#searchResults { 
+    display: none; 
+    gap: 20px; 
+    overflow-x: auto; 
+    padding: 20px; 
+    background: #0b0f19; 
+    border-radius: 20px; 
+    border: 1px solid rgba(255, 255, 255, 0.1); 
+    margin-top: 10px; 
+    z-index: 1001; 
+    width: 100%;
+    box-sizing: border-box;
+}
 #searchResults.active { display: flex; }
 
-/* Sections */
+.movie-card { transition: transform 0.3s, opacity 0.3s, filter 0.3s; }
+.movie-card.added-state {
+    filter: grayscale(1) brightness(0.5);
+    transform: scale(0.95);
+    pointer-events: none;
+}
+.movie-card.added-state::after {
+    content: '✓ Added';
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #4ade80;
+    font-weight: 900;
+    font-size: 1.2rem;
+    z-index: 20;
+}
+
 .section-watchlist { background: var(--vault-deep); width: 100%; padding: 60px 0; border-top: 1px solid rgba(255,255,255,0.03); border-bottom: 1px solid rgba(255,255,255,0.03); }
 .section-archive { width: 100%; padding: 60px 0; }
 .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }
 h2 { font-size: 1.1rem; font-weight: 900; letter-spacing: 1px; color: var(--text); margin: 0; }
 
 .sort-container { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
-.sort-btn { 
-    background: var(--card); border: 1px solid rgba(255,255,255,0.05); 
-    color: #94a3b8; padding: 6px 12px; border-radius: 8px; 
-    font-size: 0.7rem; font-weight: 700; cursor: pointer; 
-}
+.sort-btn { background: var(--card); border: 1px solid rgba(255,255,255,0.05); color: #94a3b8; padding: 6px 12px; border-radius: 8px; font-size: 0.7rem; font-weight: 700; cursor: pointer; }
 .sort-btn.active { background: var(--accent); color: #0b0f19; }
 
-/* Grid */
 .movie-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 25px; }
 .archive-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 20px; }
 
@@ -80,7 +101,6 @@ h2 { font-size: 1.1rem; font-weight: 900; letter-spacing: 1px; color: var(--text
     .content-wrapper { padding: 0 15px; }
 }
 
-/* Card */
 .movie-card { background: var(--card); border-radius: 16px; border: 1px solid rgba(255,255,255,0.06); position: relative; overflow: hidden; height: 100%; display: flex; flex-direction: column; }
 .poster-wrapper { position: relative; width: 100%; aspect-ratio: 2 / 3; cursor: pointer; }
 .card-poster { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
@@ -90,7 +110,6 @@ h2 { font-size: 1.1rem; font-weight: 900; letter-spacing: 1px; color: var(--text
 .runtime-text { font-size: 0.75rem; font-weight: 600; color: white; }
 .remove-btn { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.6); width: 22px; height: 22px; border-radius: 50%; color: #ef4444; border: none; font-size: 9px; z-index: 10; cursor: pointer; }
 
-/* Modal Logic & Genre Pill */
 #detailsModal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 2000; backdrop-filter: blur(15px); justify-content: center; align-items: center; padding: 15px; }
 .modal-content { background: #0f172a; max-width: 600px; width: 100%; border-radius: 28px; padding: 35px; position: relative; max-height: 85vh; overflow-y: auto; box-shadow: 0 40px 100px rgba(0,0,0,0.8); scrollbar-width: none; }
 .modal-content::-webkit-scrollbar { display: none; }
@@ -100,7 +119,6 @@ h2 { font-size: 1.1rem; font-weight: 900; letter-spacing: 1px; color: var(--text
 .modal-info-label { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 1px; color: #64748b; margin-bottom: 2px; font-weight: 800; }
 .modal-info-value { font-size: 0.85rem; color: #cbd5e1; margin-bottom: 12px; line-height: 1.4; }
 
-/* The Pill Style */
 .genre-pill {
     background: rgba(255, 255, 255, 0.05);
     border: 1px solid rgba(255, 255, 255, 0.1);
@@ -117,12 +135,20 @@ h2 { font-size: 1.1rem; font-weight: 900; letter-spacing: 1px; color: var(--text
 .btn-group { display: flex; gap: 10px; margin-top: 25px; }
 .modal-btn { flex: 1; padding: 12px 10px; border-radius: 12px; font-weight: 700; text-decoration: none; font-size: 0.75rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.3s; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.03); color: #fff; }
 
+/* Feedback style for moving back */
+.btn-restore:hover { background: rgba(56, 189, 248, 0.1); border-color: var(--accent); color: var(--accent); }
+
 @media (max-width: 650px) {
     .modal-content { padding: 35px 20px 25px 20px; text-align: center; max-height: 80vh; }
     .modal-body { flex-direction: column; align-items: center; text-align: center; gap: 20px; }
     .modal-poster { width: 140px; border-radius: 12px; }
     .info-row { justify-content: center; gap: 15px; }
     .btn-group { flex-direction: row; width: 100%; gap: 8px; }
+}
+
+#authOverlay .auth-card {
+    max-width: 350px;
+    margin: 0 auto;
 }
 
 #msg { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); padding: 12px 24px; border-radius: 50px; z-index: 3000; display: none; color: white; font-weight: bold; }
