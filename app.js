@@ -246,3 +246,18 @@ function closeModal() {
     document.getElementById('detailsModal').style.display = 'none'; 
     document.body.classList.remove('modal-open');
 }
+
+function toggleSearch() {
+    const drawer = document.getElementById('searchDrawer');
+    const btn = document.getElementById('addBtn');
+    const isOpen = drawer.classList.toggle('open');
+    btn.classList.toggle('active', isOpen);
+    if (isOpen) {
+        setTimeout(() => document.getElementById('movieInput').focus(), 300);
+    } else {
+        document.getElementById('searchResults').classList.remove('active');
+        document.getElementById('searchResults').innerHTML = '';
+        document.getElementById('movieInput').value = '';
+        document.getElementById('clearSearch').style.display = 'none';
+    }
+}
