@@ -99,6 +99,7 @@ function render(movies) {
         const html = `
             <div class="movie-card">
                 <button class="remove-btn" onclick="deleteMovie('${m.imdb_id}')">✕</button>
+                ${m.is_tv_show ? '<span class="tv-badge">TV</span>' : ''}
                 <div class="poster-wrapper skeleton-shimmer" onclick="showDetails('${m.imdb_id}')">
                     <img class="card-poster" src="${m.poster}" onload="this.classList.add('loaded')">
                 </div>
@@ -135,15 +136,16 @@ async function addToVault(id) {
     const res = await fetch(`/api?type=detail&id=${id}`);
     const d = await res.json();
     
-    await _supabase.from('movies').upsert([{ 
-        imdb_id: d.imdbID, 
-        title: d.Title, 
-        poster: d.Poster, 
-        year: d.Released, 
-        runtime: d.Runtime, 
-        rating: d.imdbRating, 
-        genre: d.Genre, 
-        status: 'want' 
+    await _supabase.from('movies').upsert([{
+        imdb_id: d.imdbID,
+        title: d.Title,
+        poster: d.Poster,
+        year: d.Released,
+        runtime: d.Runtime,
+        rating: d.imdbRating,
+        genre: d.Genre,
+        status: 'want',
+        is_tv_show: d.Type === 'series'
     }]);
     
     setTimeout(() => {
