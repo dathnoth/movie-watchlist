@@ -6,7 +6,25 @@ const { createClient } = supabase;
 let debounceTimer;
 let currentSort = 'title';
 let cachedMovies = [];
-const VAULT_PIN = '0234'; 
+const VAULT_PIN = '0234';
+
+// YTS state
+let ytsPage = 1;
+let ytsQuality = '';
+let ytsTotalCount = 0;
+const YTS_LIMIT = 20;
+const YTS_BASE = 'https://yts.mx/api/v2/list_movies.json';
+const ytsCache = {};
+const MAGNET_TRACKERS = [
+    'udp://open.demonii.com:1337/announce',
+    'udp://tracker.openbittorrent.com:80',
+    'udp://tracker.coppersurfer.tk:6969',
+    'udp://glotorrents.pw:6969/announce',
+    'udp://tracker.opentrackr.org:1337/announce',
+    'udp://torrent.gresille.org:80/announce',
+    'udp://p4p.arenabg.com:1337',
+    'udp://tracker.leechers-paradise.org:6969'
+].map(t => `&tr=${encodeURIComponent(t)}`).join('');
 
 // Initialize Supabase with the x-vault-pin header for RLS Security
 const _supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
@@ -247,6 +265,215 @@ function checkPin() {
 function closeModal() { 
     document.getElementById('detailsModal').style.display = 'none'; 
     document.body.classList.remove('modal-open');
+}
+
+function escapeHtml(str) {
+    if (typeof str !== 'string') return str ?? '';
+    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function toggleYTS() {
+    const drawer = document.getElementById('ytsDrawer');
+    const btn = document.getElementById('ytsToggleBtn');
+    const isOpen = drawer.classList.toggle('open');
+    btn.classList.toggle('open', isOpen);
+    btn.textContent = isOpen ? 'Close ▴' : 'Browse ▾';
+    if (isOpen && document.getElementById('ytsList').children.length === 0) {
+        fetchYTS(1);
+    }
+}
+
+function setYTSQuality(el, quality) {
+    ytsQuality = quality;
+    document.querySelectorAll('.yts-filter-btn').forEach(b => b.classList.remove('active'));
+    el.classList.add('active');
+    fetchYTS(1);
+}
+
+async function fetchYTS(page) {
+    ytsPage = page;
+    const genre  = document.getElementById('ytsGenre').value;
+    const sortBy = document.getElementById('ytsSort').value;
+    const list   = document.getElementById('ytsList');
+    const loadMoreBtn = document.getElementById('ytsLoadMore');
+
+    if (page === 1) {
+        list.innerHTML = Array(YTS_LIMIT)
+            .fill('<div class="movie-card skeleton-shimmer" style="aspect-ratio:2/3;"></div>')
+            .join('');
+        loadMoreBtn.style.display = 'none';
+    }
+
+    const params = new URLSearchParams({ limit: YTS_LIMIT, page, sort_by: sortBy, order_by: 'desc' });
+    if (genre) params.set('genre', genre);
+    if (ytsQuality) params.set('quality', ytsQuality);
+
+    try {
+        const res  = await fetch(`${YTS_BASE}?${params}`);
+        const json = await res.json();
+
+        if (json.status !== 'ok' || !json.data?.movies?.length) {
+            if (page === 1) list.innerHTML = '<p style="color:#64748b; padding:20px 0;">No movies found for these filters.</p>';
+            loadMoreBtn.style.display = 'none';
+            return;
+        }
+
+        ytsTotalCount = json.data.movie_count;
+        if (page === 1) list.innerHTML = '';
+        json.data.movies.forEach(m => list.appendChild(buildYTSCard(m)));
+
+        const loaded = page * YTS_LIMIT;
+        loadMoreBtn.style.display = loaded < ytsTotalCount ? 'block' : 'none';
+        loadMoreBtn.classList.remove('loading');
+    } catch (err) {
+        if (page === 1) list.innerHTML = '<p style="color:#ef4444; padding:20px 0;">Failed to load YTS movies. Please try again.</p>';
+        loadMoreBtn.style.display = 'none';
+    }
+}
+
+function loadMoreYTS() {
+    document.getElementById('ytsLoadMore').classList.add('loading');
+    fetchYTS(ytsPage + 1);
+}
+
+function buildYTSCard(m) {
+    ytsCache[m.id] = m;
+    const qualities = (m.torrents || []).map(t => t.quality);
+    const bestQuality = ['2160p','1080p','720p','3D'].find(q => qualities.includes(q)) || qualities[0] || '?';
+    const maxSeeds = Math.max(...(m.torrents || []).map(t => t.seeds || 0), 0);
+
+    const card = document.createElement('div');
+    card.className = 'movie-card';
+    card.innerHTML = `
+        <div class="poster-wrapper skeleton-shimmer" onclick="showTorrentModal(${m.id})">
+            <img class="card-poster"
+                 src="${escapeHtml(m.medium_cover_image)}"
+                 alt="${escapeHtml(m.title)}"
+                 onload="this.classList.add('loaded')"
+                 onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22180%22 height=%22270%22%3E%3Crect fill=%22%231e293b%22 width=%22180%22 height=%22270%22/%3E%3C/svg%3E'">
+            <span class="yts-quality-badge">${escapeHtml(bestQuality)}</span>
+        </div>
+        <div class="card-content" onclick="showTorrentModal(${m.id})">
+            <div class="movie-title">${escapeHtml(m.title)}</div>
+            <span class="genre-tag">${escapeHtml((m.genres || ['Unknown'])[0])}</span>
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span class="runtime-text">${m.year}</span>
+                <span style="color:#fbbf24; font-size:0.75rem; font-weight:bold;">⭐ ${m.rating}</span>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px;">
+                <span class="yts-seeds">▲ ${maxSeeds.toLocaleString()}</span>
+                <span style="font-size:0.65rem; color:#64748b;">${m.runtime ? m.runtime + ' min' : ''}</span>
+            </div>
+        </div>`;
+    return card;
+}
+
+function showTorrentModal(ytsId) {
+    const modal = document.getElementById('torrentModal');
+    const data  = document.getElementById('torrentModalData');
+    modal.style.display = 'flex';
+    document.body.classList.add('modal-open');
+
+    const movie = ytsCache[ytsId];
+    if (!movie) {
+        data.innerHTML = '<p style="padding:20px; color:#64748b;">Loading...</p>';
+        fetch(`https://yts.mx/api/v2/movie_details.json?movie_id=${ytsId}&with_images=true`)
+            .then(r => r.json())
+            .then(json => {
+                if (json.data?.movie) { ytsCache[ytsId] = json.data.movie; renderTorrentModal(json.data.movie); }
+                else data.innerHTML = '<p style="color:#ef4444;">Could not load details.</p>';
+            })
+            .catch(() => { data.innerHTML = '<p style="color:#ef4444;">Network error.</p>'; });
+        return;
+    }
+    renderTorrentModal(movie);
+}
+
+function renderTorrentModal(m) {
+    const data = document.getElementById('torrentModalData');
+    const alreadyInVault = cachedMovies.some(
+        cm => cm.title.toLowerCase() === m.title.toLowerCase() && String(cm.year) === String(m.year)
+    );
+
+    const qualityOrder = ['2160p','1080p','720p','3D'];
+    const torrentRows = (m.torrents || [])
+        .slice()
+        .sort((a, b) => {
+            const ai = qualityOrder.indexOf(a.quality);
+            const bi = qualityOrder.indexOf(b.quality);
+            return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+        })
+        .map(t => {
+            const magnet = buildMagnet(t.hash, m.title);
+            return `
+            <div class="torrent-row">
+                <span class="torrent-quality-label">${escapeHtml(t.quality)}</span>
+                <div class="torrent-meta">
+                    <span>${escapeHtml(t.type || '')} • ${escapeHtml(t.size || '')}</span>
+                    <span class="seeds-text">▲ ${(t.seeds||0).toLocaleString()} seeds</span>
+                    <span class="peers-text">● ${(t.peers||0).toLocaleString()} peers</span>
+                </div>
+                <div class="torrent-actions">
+                    <a href="${escapeHtml(t.url)}" class="torrent-dl-btn btn-torrent">↓ .torrent</a>
+                    <a href="${escapeHtml(magnet)}" class="torrent-dl-btn btn-magnet">⚡ Magnet</a>
+                </div>
+            </div>`;
+        }).join('');
+
+    data.innerHTML = `
+        <div class="torrent-movie-header">
+            <img class="torrent-poster" src="${escapeHtml(m.medium_cover_image)}" alt="${escapeHtml(m.title)}">
+            <div>
+                <h2 style="font-size:1.3rem; margin:0 0 6px 0; color:white;">${escapeHtml(m.title)}</h2>
+                <div style="color:var(--accent); font-size:0.8rem; font-weight:700; margin-bottom:10px;">
+                    ${m.year} • ⭐ ${m.rating} • ${m.runtime ? m.runtime + ' min' : 'N/A'}
+                </div>
+                <span class="genre-tag">${escapeHtml((m.genres||['Unknown'])[0])}</span>
+            </div>
+        </div>
+        <div class="modal-info-label">Available Torrents</div>
+        <div class="torrent-list">${torrentRows || '<p style="color:#64748b;">No torrents available.</p>'}</div>
+        <button
+            id="yts-add-btn-${m.id}"
+            class="torrent-add-watchlist-btn"
+            onclick="addYTSToVault(${m.id})"
+            ${alreadyInVault ? 'disabled' : ''}>
+            ${alreadyInVault ? '✓ Already in Watchlist' : '＋ Add to Watchlist'}
+        </button>`;
+}
+
+function buildMagnet(hash, title) {
+    return `magnet:?xt=urn:btih:${hash}&dn=${encodeURIComponent(title)}${MAGNET_TRACKERS}`;
+}
+
+function closeTorrentModal() {
+    document.getElementById('torrentModal').style.display = 'none';
+    document.body.classList.remove('modal-open');
+}
+
+async function addYTSToVault(ytsId) {
+    const btn = document.getElementById(`yts-add-btn-${ytsId}`);
+    const m   = ytsCache[ytsId];
+    if (!m || !btn) return;
+
+    btn.textContent = 'Adding...';
+    btn.disabled = true;
+
+    await _supabase.from('movies').upsert([{
+        imdb_id:    m.imdb_code || `yts-${ytsId}`,
+        title:      m.title,
+        poster:     m.large_cover_image || m.medium_cover_image,
+        year:       String(m.year),
+        runtime:    m.runtime ? `${m.runtime} min` : 'N/A',
+        rating:     String(m.rating),
+        genre:      (m.genres || ['Unknown'])[0],
+        status:     'want',
+        is_tv_show: false
+    }]);
+
+    btn.textContent = '✓ Added to Watchlist';
+    btn.style.backgroundColor = '#22c55e';
+    fetchMovies();
 }
 
 function toggleSearch() {

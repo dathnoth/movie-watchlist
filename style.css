@@ -236,3 +236,274 @@ h2 { font-size: 1.1rem; font-weight: 900; letter-spacing: 1px; color: var(--text
     background: #f87171;
     box-shadow: 0 8px 25px rgba(248, 113, 113, 0.4);
 }
+
+/* ===================== YTS SECTION ===================== */
+
+.section-yts {
+    background: var(--vault-deep);
+    width: 100%;
+    padding: 60px 0;
+    border-top: 1px solid rgba(255,255,255,0.03);
+}
+
+.yts-badge {
+    font-size: 0.55rem;
+    font-weight: 900;
+    letter-spacing: 1px;
+    background: rgba(56, 189, 248, 0.15);
+    color: var(--accent);
+    border: 1px solid rgba(56, 189, 248, 0.3);
+    padding: 3px 8px;
+    border-radius: 4px;
+}
+
+.yts-toggle-btn {
+    background: var(--card);
+    border: 1px solid rgba(255,255,255,0.08);
+    color: var(--accent);
+    padding: 8px 16px;
+    border-radius: 10px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    cursor: pointer;
+    letter-spacing: 0.5px;
+    transition: background 0.2s, color 0.2s;
+}
+.yts-toggle-btn.open {
+    background: var(--accent);
+    color: #0b0f19;
+}
+
+.yts-drawer {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.yts-drawer.open {
+    max-height: 9000px;
+}
+
+.yts-filters {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-bottom: 25px;
+    padding-top: 20px;
+}
+
+.yts-filters select {
+    background: var(--card);
+    border: 1px solid rgba(255,255,255,0.08);
+    color: var(--text);
+    padding: 8px 14px;
+    border-radius: 10px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    outline: none;
+    width: auto;
+    box-shadow: none;
+    backdrop-filter: none;
+    font-family: inherit;
+}
+
+.yts-quality-pills {
+    display: flex;
+    gap: 6px;
+}
+
+.yts-filter-btn {
+    background: var(--card);
+    border: 1px solid rgba(255,255,255,0.05);
+    color: #94a3b8;
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+.yts-filter-btn.active {
+    background: var(--accent);
+    color: #0b0f19;
+}
+
+.yts-quality-badge {
+    position: absolute;
+    bottom: 10px;
+    left: 10px;
+    background: rgba(0,0,0,0.75);
+    color: var(--accent);
+    font-size: 0.55rem;
+    font-weight: 900;
+    letter-spacing: 0.5px;
+    padding: 3px 7px;
+    border-radius: 4px;
+    z-index: 10;
+    pointer-events: none;
+    border: 1px solid rgba(56, 189, 248, 0.3);
+}
+
+.yts-seeds {
+    font-size: 0.65rem;
+    color: #4ade80;
+    font-weight: 700;
+}
+
+.yts-pagination {
+    display: flex;
+    justify-content: center;
+    padding: 30px 0 10px 0;
+}
+
+.yts-load-more {
+    background: var(--card);
+    border: 1px solid rgba(255,255,255,0.08);
+    color: var(--text);
+    padding: 14px 40px;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    cursor: pointer;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    transition: background 0.2s, border-color 0.2s;
+    display: none;
+}
+.yts-load-more:hover {
+    background: rgba(56,189,248,0.1);
+    border-color: var(--accent);
+    color: var(--accent);
+}
+.yts-load-more.loading {
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+/* Torrent Modal */
+#torrentModal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.9);
+    z-index: 2100;
+    backdrop-filter: blur(15px);
+    justify-content: center;
+    align-items: center;
+    padding: 15px;
+}
+
+.torrent-modal-content {
+    max-width: 520px;
+}
+
+.torrent-movie-header {
+    display: flex;
+    gap: 20px;
+    align-items: flex-start;
+    margin-bottom: 25px;
+}
+
+.torrent-poster {
+    width: 80px;
+    height: 120px;
+    object-fit: cover;
+    border-radius: 10px;
+    flex-shrink: 0;
+}
+
+.torrent-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.torrent-row {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 12px;
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.torrent-quality-label {
+    font-size: 0.85rem;
+    font-weight: 900;
+    color: var(--accent);
+    min-width: 50px;
+}
+
+.torrent-meta {
+    flex: 1;
+    font-size: 0.72rem;
+    color: #94a3b8;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.torrent-meta .seeds-text { color: #4ade80; font-weight: 700; }
+.torrent-meta .peers-text { color: #fb923c; }
+
+.torrent-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.torrent-dl-btn {
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(255,255,255,0.1);
+    cursor: pointer;
+    transition: 0.2s;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+}
+.torrent-dl-btn.btn-torrent {
+    background: rgba(56,189,248,0.15);
+    color: var(--accent);
+    border-color: rgba(56,189,248,0.3);
+}
+.torrent-dl-btn.btn-magnet {
+    background: rgba(167,139,250,0.15);
+    color: #a78bfa;
+    border-color: rgba(167,139,250,0.3);
+}
+
+.torrent-add-watchlist-btn {
+    width: 100%;
+    margin-top: 20px;
+    padding: 14px;
+    border-radius: 12px;
+    background: var(--accent);
+    color: #0b0f19;
+    border: none;
+    font-weight: 900;
+    font-size: 0.8rem;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: opacity 0.2s;
+    box-sizing: border-box;
+}
+.torrent-add-watchlist-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+@media (max-width: 600px) {
+    .yts-filters { gap: 8px; }
+    .yts-filters select { width: 100%; }
+    .yts-quality-pills { width: 100%; }
+}

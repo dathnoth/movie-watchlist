@@ -63,6 +63,55 @@
                     <div id="watchedList" class="movie-grid archive-grid"></div>
                 </div>
             </section>
+
+            <section id="yts-section" class="section-yts">
+                <div class="content-wrapper">
+                    <div class="section-header">
+                        <div style="display:flex; align-items:center; gap:12px;">
+                            <h2>YTS</h2>
+                            <span class="yts-badge">TORRENTS</span>
+                        </div>
+                        <button id="ytsToggleBtn" class="yts-toggle-btn" onclick="toggleYTS()">Browse ▾</button>
+                    </div>
+                    <div id="ytsDrawer" class="yts-drawer">
+                        <div class="yts-filters">
+                            <select id="ytsGenre" onchange="fetchYTS(1)">
+                                <option value="">All Genres</option>
+                                <option value="action">Action</option>
+                                <option value="adventure">Adventure</option>
+                                <option value="animation">Animation</option>
+                                <option value="comedy">Comedy</option>
+                                <option value="crime">Crime</option>
+                                <option value="documentary">Documentary</option>
+                                <option value="drama">Drama</option>
+                                <option value="fantasy">Fantasy</option>
+                                <option value="horror">Horror</option>
+                                <option value="mystery">Mystery</option>
+                                <option value="romance">Romance</option>
+                                <option value="sci-fi">Sci-Fi</option>
+                                <option value="thriller">Thriller</option>
+                                <option value="western">Western</option>
+                            </select>
+                            <div class="yts-quality-pills">
+                                <button class="yts-filter-btn active" onclick="setYTSQuality(this, '')">All</button>
+                                <button class="yts-filter-btn" onclick="setYTSQuality(this, '720p')">720p</button>
+                                <button class="yts-filter-btn" onclick="setYTSQuality(this, '1080p')">1080p</button>
+                                <button class="yts-filter-btn" onclick="setYTSQuality(this, '2160p')">4K</button>
+                            </div>
+                            <select id="ytsSort" onchange="fetchYTS(1)">
+                                <option value="date_added">Latest</option>
+                                <option value="seeds">Most Seeded</option>
+                                <option value="rating">Top Rated</option>
+                                <option value="year">Year</option>
+                            </select>
+                        </div>
+                        <div id="ytsList" class="movie-grid"></div>
+                        <div class="yts-pagination">
+                            <button id="ytsLoadMore" class="yts-load-more" onclick="loadMoreYTS()">Load More</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
         </div>
 
         <div id="rouletteWrapper" class="roulette-hidden">
@@ -76,6 +125,13 @@
             <div class="modal-content" onclick="event.stopPropagation()">
                 <button class="modal-close" onclick="closeModal()">✕</button>
                 <div id="modalData"></div>
+            </div>
+        </div>
+
+        <div id="torrentModal" onclick="closeTorrentModal()">
+            <div class="modal-content torrent-modal-content" onclick="event.stopPropagation()">
+                <button class="modal-close" onclick="closeTorrentModal()">✕</button>
+                <div id="torrentModalData"></div>
             </div>
         </div>
     </div>
