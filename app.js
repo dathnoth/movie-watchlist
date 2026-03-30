@@ -13,7 +13,7 @@ let ytsPage = 1;
 let ytsQuality = '';
 let ytsTotalCount = 0;
 const YTS_LIMIT = 20;
-const YTS_BASE = 'https://yts.mx/api/v2/list_movies.json';
+const YTS_BASE = 'https://yts.lt/api/v2/list_movies.json';
 const ytsCache = {};
 const MAGNET_TRACKERS = [
     'udp://open.demonii.com:1337/announce',
@@ -377,7 +377,7 @@ function showTorrentModal(ytsId) {
     const movie = ytsCache[ytsId];
     if (!movie) {
         data.innerHTML = '<p style="padding:20px; color:#64748b;">Loading...</p>';
-        fetch(`https://yts.mx/api/v2/movie_details.json?movie_id=${ytsId}&with_images=true`)
+        fetch(`https://yts.lt/api/v2/movie_details.json?movie_id=${ytsId}&with_images=true`)
             .then(r => r.json())
             .then(json => {
                 if (json.data?.movie) { ytsCache[ytsId] = json.data.movie; renderTorrentModal(json.data.movie); }
