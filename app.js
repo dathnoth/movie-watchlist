@@ -304,7 +304,7 @@ async function fetchYTS(page) {
         loadMoreBtn.style.display = 'none';
     }
 
-    const params = new URLSearchParams({ limit: YTS_LIMIT, page, sort_by: sortBy, order_by: 'desc' });
+    const params = new URLSearchParams({ limit: YTS_LIMIT, page, sort_by: sortBy, order_by: 'desc', minimum_rating: 6 });
     if (genre) params.set('genre', genre);
     if (ytsQuality) params.set('quality', ytsQuality);
 
