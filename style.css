@@ -192,9 +192,76 @@ h2 { font-size: 1.1rem; font-weight: 900; letter-spacing: 1px; color: var(--text
     .btn-group { flex-direction: row; width: 100%; gap: 8px; }
 }
 
+#authOverlay {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+}
+
 #authOverlay .auth-card {
     max-width: 350px;
     margin: 0 auto;
+    text-align: center;
+}
+
+.pin-boxes {
+    display: flex;
+    gap: 14px;
+    justify-content: center;
+    margin-bottom: 16px;
+}
+
+.pin-box {
+    width: 60px;
+    height: 68px;
+    border-radius: 14px;
+    border: 2px solid #38bdf8;
+    background: rgba(15, 23, 42, 0.95);
+    color: white;
+    font-size: 1.6rem;
+    text-align: center;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    box-shadow: 0 4px 16px rgba(56, 189, 248, 0.15);
+    caret-color: transparent;
+}
+
+.pin-box:focus {
+    border-color: #7dd3fc;
+    box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.25);
+}
+
+.pin-box.loading {
+    opacity: 0.5;
+    animation: pulse 0.6s ease-in-out infinite alternate;
+}
+
+.pin-error {
+    font-size: 0.78rem;
+    color: #f87171;
+    margin: 0;
+    min-height: 1.2em;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    20%       { transform: translateX(-8px); }
+    40%       { transform: translateX(8px); }
+    60%       { transform: translateX(-5px); }
+    80%       { transform: translateX(5px); }
+}
+
+.pin-box.shake {
+    animation: shake 0.4s ease;
+    border-color: #f87171;
+}
+
+@keyframes pulse {
+    from { opacity: 0.5; }
+    to   { opacity: 0.9; }
 }
 
 #msg { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); padding: 12px 24px; border-radius: 50px; z-index: 3000; display: none; color: white; font-weight: bold; }

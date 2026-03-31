@@ -250,17 +250,52 @@ async function updateStatus(id, s) {
 async function deleteMovie(id) { if(confirm("Remove?")) { await _supabase.from('movies').delete().eq('imdb_id', id); fetchMovies(); } }
 
 function checkPin() {
-    const input = document.getElementById('pinInput').value;
-    if (input === VAULT_PIN) {
-        document.getElementById('authOverlay').style.display = 'none';
-        document.getElementById('mainApp').style.display = 'block';
-        localStorage.setItem('vault_auth', Date.now());
-        fetchMovies();
-    } else { 
-        alert("Incorrect PIN"); 
-        document.getElementById('pinInput').value = '';
+    const boxes = document.querySelectorAll('.pin-box');
+    const pin = Array.from(boxes).map(b => b.value).join('');
+    const errorEl = document.getElementById('pinError');
+
+    if (pin === VAULT_PIN) {
+        boxes.forEach(b => b.classList.add('loading'));
+        setTimeout(() => {
+            document.getElementById('authOverlay').style.display = 'none';
+            document.getElementById('mainApp').style.display = 'block';
+            localStorage.setItem('vault_auth', Date.now());
+            boxes.forEach(b => { b.value = ''; b.classList.remove('loading'); });
+            fetchMovies();
+        }, 400);
+    } else {
+        boxes.forEach(b => { b.value = ''; b.classList.add('shake'); });
+        errorEl.textContent = 'Incorrect PIN — try again';
+        errorEl.style.opacity = '1';
+        setTimeout(() => {
+            boxes.forEach(b => b.classList.remove('shake'));
+            errorEl.style.opacity = '0';
+        }, 1500);
+        boxes[0].focus();
     }
 }
+
+document.addEventListener('DOMContentLoaded', () => {
+    const boxes = document.querySelectorAll('.pin-box');
+    boxes.forEach((box, i) => {
+        box.addEventListener('input', () => {
+            if (box.value.length === 1) {
+                if (i < boxes.length - 1) {
+                    boxes[i + 1].focus();
+                } else {
+                    checkPin();
+                }
+            }
+        });
+        box.addEventListener('keydown', (e) => {
+            if (e.key === 'Backspace' && box.value === '' && i > 0) {
+                boxes[i - 1].value = '';
+                boxes[i - 1].focus();
+            }
+        });
+    });
+    if (boxes.length) boxes[0].focus();
+});
 
 function closeModal() { 
     document.getElementById('detailsModal').style.display = 'none'; 
