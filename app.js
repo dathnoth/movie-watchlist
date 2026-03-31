@@ -194,13 +194,26 @@ async function showDetails(id) {
             </div>
         </div>`;
     
-    const { data: local } = await _supabase.from('movies').select('*').eq('imdb_id', id).single();
-    
-    const res = await fetch(`/api?type=detail&id=${id}`);
-    const d = await res.json();
+    let local = null, d = null;
+    try {
+        const [supaRes, apiRes] = await Promise.all([
+            _supabase.from('movies').select('*').eq('imdb_id', id).single(),
+            fetch(`/api?type=detail&id=${id}`)
+        ]);
+        local = supaRes.data;
+        d = await apiRes.json();
+    } catch (err) {
+        content.innerHTML = '<p style="color:#f87171; padding:20px;">Failed to load movie details. Please try again.</p>';
+        return;
+    }
+    if (!d || !d.Title) {
+        content.innerHTML = '<p style="color:#f87171; padding:20px;">Movie details not available.</p>';
+        return;
+    }
     
     const ytUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(d.Title + ' trailer')}`;
     const isWatched = local?.status === 'watched';
+
 
     content.innerHTML = `
         <div class="modal-body">

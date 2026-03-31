@@ -84,7 +84,8 @@ input { width: 100%; padding: 18px 24px; border-radius: 20px; border: 1px solid 
 .section-watchlist { background: var(--vault-deep); width: 100%; padding: 60px 0; border-top: 1px solid rgba(255,255,255,0.03); border-bottom: 1px solid rgba(255,255,255,0.03); }
 .section-archive { width: 100%; padding: 60px 0; }
 .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }
-h2 { font-size: 1.1rem; font-weight: 900; letter-spacing: 1px; color: var(--text); margin: 0; padding-left: 12px; border-left: 3px solid var(--accent); }
+h2 { font-size: 1.1rem; font-weight: 900; letter-spacing: 1px; color: var(--text); margin: 0; }
+.section-header h2 { padding-left: 12px; border-left: 3px solid var(--accent); }
 
 .sort-container { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
 .sort-btn { background: var(--card); border: 1px solid rgba(255,255,255,0.05); color: #94a3b8; padding: 10px 14px; border-radius: 8px; font-size: 0.7rem; font-weight: 700; cursor: pointer; min-height: 44px; transition: background 0.2s, color 0.2s, border-color 0.2s; }
