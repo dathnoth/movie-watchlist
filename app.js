@@ -176,7 +176,7 @@ async function addToVault(id) {
 async function showDetails(id) {
     const modal = document.getElementById('detailsModal');
     const content = document.getElementById('modalData');
-    modal.style.display = 'flex';
+    modal.classList.add('open');
     document.body.classList.add('modal-open');
     
     content.innerHTML = `
@@ -298,7 +298,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function closeModal() { 
-    document.getElementById('detailsModal').style.display = 'none'; 
+    document.getElementById('detailsModal').classList.remove('open');
     document.body.classList.remove('modal-open');
 }
 
@@ -310,11 +310,27 @@ function escapeHtml(str) {
 function toggleYTS() {
     const drawer = document.getElementById('ytsDrawer');
     const btn = document.getElementById('ytsToggleBtn');
-    const isOpen = drawer.classList.toggle('open');
-    btn.classList.toggle('open', isOpen);
-    btn.textContent = isOpen ? 'Close ▴' : 'Browse ▾';
-    if (isOpen && document.getElementById('ytsList').children.length === 0) {
-        fetchYTS(1);
+    const isOpen = !drawer.style.maxHeight || drawer.style.maxHeight === '0px';
+
+    if (isOpen) {
+        drawer.style.maxHeight = drawer.scrollHeight + 'px';
+        btn.classList.add('open');
+        btn.textContent = 'Close ▴';
+        if (document.getElementById('ytsList').children.length === 0) {
+            fetchYTS(1);
+        }
+    } else {
+        drawer.style.maxHeight = drawer.scrollHeight + 'px';
+        requestAnimationFrame(() => { drawer.style.maxHeight = '0px'; });
+        btn.classList.remove('open');
+        btn.textContent = 'Browse ▾';
+    }
+}
+
+function updateYTSDrawerHeight() {
+    const drawer = document.getElementById('ytsDrawer');
+    if (drawer.style.maxHeight && drawer.style.maxHeight !== '0px') {
+        drawer.style.maxHeight = drawer.scrollHeight + 'px';
     }
 }
 
@@ -360,6 +376,7 @@ async function fetchYTS(page) {
         const loaded = page * YTS_LIMIT;
         loadMoreBtn.style.display = loaded < ytsTotalCount ? 'block' : 'none';
         loadMoreBtn.classList.remove('loading');
+        updateYTSDrawerHeight();
     } catch (err) {
         if (page === 1) list.innerHTML = '<p style="color:#ef4444; padding:20px 0;">Failed to load YTS movies. Please try again.</p>';
         loadMoreBtn.style.display = 'none';
@@ -406,7 +423,7 @@ function buildYTSCard(m) {
 function showTorrentModal(ytsId) {
     const modal = document.getElementById('torrentModal');
     const data  = document.getElementById('torrentModalData');
-    modal.style.display = 'flex';
+    modal.classList.add('open');
     document.body.classList.add('modal-open');
 
     const movie = ytsCache[ytsId];
@@ -482,7 +499,7 @@ function buildMagnet(hash, title) {
 }
 
 function closeTorrentModal() {
-    document.getElementById('torrentModal').style.display = 'none';
+    document.getElementById('torrentModal').classList.remove('open');
     document.body.classList.remove('modal-open');
 }
 
