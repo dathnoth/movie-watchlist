@@ -114,6 +114,9 @@ function render(movies) {
     watched.innerHTML = '';
     
     movies.forEach(m => {
+        const watchedLine = m.status === 'watched' && m.watched_at
+            ? `<div style="font-size:0.65rem; color:#64748b; margin-top:4px;">Watched ${new Date(m.watched_at + 'T00:00:00').toLocaleDateString('en-GB', {day:'numeric', month:'short', year:'numeric'})}</div>`
+            : '';
         const html = `
             <div class="movie-card">
                 <button class="remove-btn" onclick="deleteMovie('${m.imdb_id}')">✕</button>
@@ -128,6 +131,7 @@ function render(movies) {
                         <span class="runtime-text">${m.runtime}</span>
                         <span style="color:#fbbf24; font-size:0.75rem; font-weight:bold;">⭐ ${m.rating}</span>
                     </div>
+                    ${watchedLine}
                 </div>
             </div>`;
         m.status === 'watched' ? watched.innerHTML += html : want.innerHTML += html;
@@ -256,7 +260,8 @@ async function updateStatus(id, s) {
         btn.style.backgroundColor = s === 'watched' ? "#22c55e" : "var(--accent)";
         btn.style.color = "#000";
     }
-    await _supabase.from('movies').update({status: s}).eq('imdb_id', id);
+    const watchedAt = s === 'watched' ? new Date().toISOString().split('T')[0] : null;
+    await _supabase.from('movies').update({status: s, watched_at: watchedAt}).eq('imdb_id', id);
     setTimeout(() => { closeModal(); fetchMovies(); }, 600);
 }
 

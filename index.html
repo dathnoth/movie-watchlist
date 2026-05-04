@@ -14,16 +14,14 @@
     <div id="authOverlay">
         <div class="auth-card">
             <div class="header-area">
-                <h1>MOVIE<span>VAULT
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="28" height="28" style="vertical-align:middle;margin-left:4px;"><path d="M5 3a2 2 0 0 0-2 2v1h18V5a2 2 0 0 0-2-2H5ZM3 8v11a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8H3Zm5 3h2v2H8v-2Zm0 4h2v2H8v-2Zm4-4h2v2h-2v-2Zm0 4h2v2h-2v-2Zm4-4h2v2h-2v-2Zm0 4h2v2h-2v-2Z"/></svg>
-                </span></h1>
+                <h1>MOVIE<span>VAULT</span></h1>
             </div>
             <p style="font-size: 0.8rem; color: #64748b; margin-bottom: 24px;">Secure Entry Required</p>
             <div id="pinBoxes" class="pin-boxes">
-                <input class="pin-box" type="password" inputmode="numeric" maxlength="1" pattern="\d*">
-                <input class="pin-box" type="password" inputmode="numeric" maxlength="1" pattern="\d*">
-                <input class="pin-box" type="password" inputmode="numeric" maxlength="1" pattern="\d*">
-                <input class="pin-box" type="password" inputmode="numeric" maxlength="1" pattern="\d*">
+                <input class="pin-box" type="password" inputmode="numeric" maxlength="1" pattern="\d*" autocomplete="new-password" autofocus>
+                <input class="pin-box" type="password" inputmode="numeric" maxlength="1" pattern="\d*" autocomplete="new-password">
+                <input class="pin-box" type="password" inputmode="numeric" maxlength="1" pattern="\d*" autocomplete="new-password">
+                <input class="pin-box" type="password" inputmode="numeric" maxlength="1" pattern="\d*" autocomplete="new-password">
             </div>
             <p id="pinError" class="pin-error"></p>
         </div>
