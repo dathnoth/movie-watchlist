@@ -5,4 +5,4 @@ compatibility_date = "2026-08-01"
 [[d1_databases]]
 binding = "DB"
 database_name = "movievault"
-database_id = "PLACEHOLDER_REPLACE_AFTER_CREATE"
+database_id = "9b348428-ccf5-4069-9a10-71da8b1c7902"
