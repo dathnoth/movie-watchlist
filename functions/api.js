@@ -17,9 +17,17 @@ export async function onRequest(context) {
   const { searchParams } = new URL(request.url);
   const type = searchParams.get('type');
 
+  // Fail closed: an unset VAULT_PIN must never authenticate anyone.
+  const expectedPin = typeof env.VAULT_PIN === 'string' && env.VAULT_PIN.length > 0
+    ? env.VAULT_PIN
+    : null;
+
   if (type === 'auth') {
-    const { pin } = await request.json();
-    return pin === env.VAULT_PIN ? json({ ok: true }) : json({ ok: false }, 401);
+    if (!expectedPin) return json({ error: 'VAULT_PIN is not configured' }, 500);
+    const { pin } = await request.json().catch(() => ({}));
+    return typeof pin === 'string' && pin === expectedPin
+      ? json({ ok: true })
+      : json({ ok: false }, 401);
   }
 
   if (type === 'search' || type === 'detail') {
@@ -31,7 +39,7 @@ export async function onRequest(context) {
     return json(await res.json());
   }
 
-  if (request.headers.get('x-vault-pin') !== env.VAULT_PIN) {
+  if (!expectedPin || request.headers.get('x-vault-pin') !== expectedPin) {
     return json({ error: 'unauthorized' }, 401);
   }
 

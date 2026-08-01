@@ -18,15 +18,15 @@ async function api(type, options = {}) {
 }
 
 function logout() {
-    localStorage.removeItem('vault_auth');
     localStorage.removeItem('vault_pin');
     document.getElementById('authOverlay').style.display = 'flex';
     document.getElementById('mainApp').style.display = 'none';
 }
 
+// The stored PIN persists until the server rejects it (see logout()), so the
+// installed PWA doesn't re-prompt on every launch.
 window.onload = () => {
-    const lastAuth = localStorage.getItem('vault_auth');
-    if (lastAuth && getPin() && (Date.now() - lastAuth < 86400000)) {
+    if (getPin()) {
         document.getElementById('authOverlay').style.display = 'none';
         document.getElementById('mainApp').style.display = 'block';
         fetchMovies();
@@ -301,7 +301,6 @@ async function checkPin() {
     boxes.forEach(b => b.classList.remove('loading'));
 
     if (res.ok) {
-        localStorage.setItem('vault_auth', Date.now());
         localStorage.setItem('vault_pin', pin);
         document.getElementById('authOverlay').style.display = 'none';
         document.getElementById('mainApp').style.display = 'block';
