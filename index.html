@@ -7,7 +7,6 @@
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#38bdf8">
     <link rel="stylesheet" href="style.css">
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
@@ -46,11 +45,25 @@
 
         <div id="msg"></div>
 
+        <div class="content-wrapper">
+            <nav class="view-tabs">
+                <button class="view-tab active" data-view="got" onclick="setView('got')">
+                    Got <span class="count-badge" id="gotCount">0</span>
+                </button>
+                <button class="view-tab" data-view="get" onclick="setView('get')">
+                    Get <span class="count-badge" id="getCount">0</span>
+                </button>
+                <button class="view-tab" data-view="archive" onclick="setView('archive')">
+                    Archive <span class="count-badge" id="archiveCount">0</span>
+                </button>
+            </nav>
+        </div>
+
         <div class="lists-container">
-            <section id="watchlist" class="section-watchlist">
+            <section id="view-got" class="view-panel active">
                 <div class="content-wrapper">
                     <div class="section-header">
-                        <h2>WATCHLIST</h2>
+                        <p class="section-hint">On the drive — ready to watch.</p>
                         <div class="sort-container">
                             <button class="sort-btn active" id="sortAlpha" onclick="setSort('title')">A-Z</button>
                             <button class="sort-btn" id="sortYear" onclick="setSort('year')">Date</button>
@@ -58,25 +71,33 @@
                             <button class="sort-btn" id="sortRuntime" onclick="setSort('runtime')">Runtime</button>
                         </div>
                     </div>
-                    <div id="wantList" class="movie-grid"></div>
-                </div>
-            </section>
-            
-            <section id="archive" class="section-archive">
-                <div class="content-wrapper">
-                    <div class="section-header">
-                        <h2>ARCHIVE</h2>
-                    </div>
-                    <div id="watchedList" class="movie-grid archive-grid"></div>
+                    <div id="gotList" class="movie-grid"></div>
                 </div>
             </section>
 
+            <section id="view-get" class="view-panel">
+                <div class="content-wrapper">
+                    <div class="section-header">
+                        <p class="section-hint">Want to track down — not on the drive yet.</p>
+                    </div>
+                    <div id="getList" class="movie-grid"></div>
+                </div>
+            </section>
+
+            <section id="view-archive" class="view-panel">
+                <div class="content-wrapper">
+                    <div class="section-header">
+                        <p class="section-hint">Already watched.</p>
+                    </div>
+                    <div id="archiveList" class="archive-list"></div>
+                </div>
+            </section>
         </div>
 
         <div id="rouletteWrapper" class="roulette-hidden">
             <button id="rouletteBtn" onclick="pickRandomMovie()">
                 <span id="rouletteIcon">🎲</span>
-                <span id="rouletteText">Pick a movie for me</span>
+                <span id="rouletteText">Pick from what I've got</span>
             </button>
         </div>
 

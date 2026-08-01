@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "movievault",
+      "runtimeExecutable": "./node_modules/.bin/wrangler",
+      "runtimeArgs": ["pages", "dev", ".", "--port", "8788"],
+      "port": 8788
+    }
+  ]
+}
