@@ -41,29 +41,16 @@
             </div>
         </div>
 
-        <button id="addBtn" onclick="toggleSearch()">＋</button>
-
         <div id="msg"></div>
-
-        <div class="content-wrapper">
-            <nav class="view-tabs">
-                <button class="view-tab active" data-view="got" onclick="setView('got')">
-                    Got <span class="count-badge" id="gotCount">0</span>
-                </button>
-                <button class="view-tab" data-view="get" onclick="setView('get')">
-                    Get <span class="count-badge" id="getCount">0</span>
-                </button>
-                <button class="view-tab" data-view="archive" onclick="setView('archive')">
-                    Archive <span class="count-badge" id="archiveCount">0</span>
-                </button>
-            </nav>
-        </div>
 
         <div class="lists-container">
             <section id="view-got" class="view-panel active">
                 <div class="content-wrapper">
                     <div class="section-header">
-                        <p class="section-hint">On the drive — ready to watch.</p>
+                        <div class="section-intro">
+                            <h2 class="section-count"><span id="gotCount">0</span> Got</h2>
+                            <p class="section-hint">On the drive — ready to watch.</p>
+                        </div>
                         <div class="sort-container">
                             <button class="sort-btn active" id="sortAlpha" onclick="setSort('title')">A-Z</button>
                             <button class="sort-btn" id="sortYear" onclick="setSort('year')">Date</button>
@@ -78,7 +65,10 @@
             <section id="view-get" class="view-panel">
                 <div class="content-wrapper">
                     <div class="section-header">
-                        <p class="section-hint">Want to track down — not on the drive yet.</p>
+                        <div class="section-intro">
+                            <h2 class="section-count"><span id="getCount">0</span> Get</h2>
+                            <p class="section-hint">Want to track down — not on the drive yet.</p>
+                        </div>
                     </div>
                     <div id="getList" class="movie-grid"></div>
                 </div>
@@ -87,19 +77,25 @@
             <section id="view-archive" class="view-panel">
                 <div class="content-wrapper">
                     <div class="section-header">
-                        <p class="section-hint">Already watched.</p>
+                        <div class="section-intro">
+                            <h2 class="section-count"><span id="archiveCount">0</span> Archived</h2>
+                            <p class="section-hint">Already watched.</p>
+                        </div>
                     </div>
                     <div id="archiveList" class="archive-list"></div>
                 </div>
             </section>
         </div>
 
-        <div id="rouletteWrapper" class="roulette-hidden">
-            <button id="rouletteBtn" onclick="pickRandomMovie()">
-                <span id="rouletteIcon">🎲</span>
-                <span id="rouletteText">Pick from what I've got</span>
-            </button>
-        </div>
+        <nav class="bottom-bar" aria-label="Library views">
+            <div class="bottom-bar-inner">
+                <button class="view-tab active" data-view="got" onclick="setView('got')">Got</button>
+                <button class="view-tab" data-view="get" onclick="setView('get')">Get</button>
+                <button class="view-tab" data-view="archive" onclick="setView('archive')">Archive</button>
+                <span class="bottom-bar-divider" aria-hidden="true"></span>
+                <button id="addBtn" onclick="toggleSearch()" aria-label="Add a movie">＋</button>
+            </div>
+        </nav>
 
         <div id="detailsModal" onclick="closeModal()">
             <div class="modal-content" onclick="event.stopPropagation()">

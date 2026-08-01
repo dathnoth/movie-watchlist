@@ -33,13 +33,6 @@ window.onload = () => {
     }
 };
 
-function updateRouletteVisibility() {
-    const roulette = document.getElementById('rouletteWrapper');
-    roulette.classList.toggle('roulette-hidden', currentView !== 'got' || window.scrollY <= 100);
-}
-
-window.addEventListener('scroll', updateRouletteVisibility);
-
 document.getElementById('movieInput').addEventListener('input', (e) => {
     const clearBtn = document.getElementById('clearSearch');
     const resultsDiv = document.getElementById('searchResults');
@@ -90,7 +83,6 @@ function setView(view) {
     currentView = view;
     document.querySelectorAll('.view-tab').forEach(t => t.classList.toggle('active', t.dataset.view === view));
     document.querySelectorAll('.view-panel').forEach(p => p.classList.toggle('active', p.id === `view-${view}`));
-    updateRouletteVisibility();
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -157,17 +149,6 @@ function render(movies) {
     document.getElementById('getCount').textContent = buckets.get.length;
     document.getElementById('gotCount').textContent = buckets.got.length;
     document.getElementById('archiveCount').textContent = buckets.archive.length;
-}
-
-function pickRandomMovie() {
-    const pool = cachedMovies.filter(m => m.status === 'got');
-    if (pool.length === 0) { alert('Nothing in GOT yet — add movies you actually have on the drive.'); return; }
-    const btn = document.getElementById('rouletteBtn');
-    btn.classList.add('shuffling');
-    setTimeout(() => {
-        btn.classList.remove('shuffling');
-        showDetails(pool[Math.floor(Math.random() * pool.length)].imdb_id);
-    }, 600);
 }
 
 async function addToVault(id) {
