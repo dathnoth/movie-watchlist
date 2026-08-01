@@ -56,7 +56,28 @@ async function liveSearch(query) {
         div.className = 'movie-card';
         div.id = `search-${m.imdbID}`;
         div.style.minWidth = '140px';
-        div.innerHTML = `<img src="${escapeHtml(m.Poster)}" style="width:100%; height:200px; object-fit:cover;"><div style="padding:10px; font-size:0.75rem; font-weight:bold;">${escapeHtml(m.Title)}</div>`;
+        // OMDB reports a missing poster as the string "N/A", not an empty field.
+        const poster = m.Poster && m.Poster !== 'N/A'
+            ? `<img src="${escapeHtml(m.Poster)}" class="search-poster">`
+            : '<div class="search-poster search-poster-empty">No poster</div>';
+        const year = m.Year && m.Year !== 'N/A'
+            ? `<div class="search-year">${escapeHtml(m.Year)}</div>`
+            : '';
+        // Matches how the library flags TV: series only, movies get no marker.
+        const tv = m.Type === 'series' ? ' <span class="tv-badge-inline">TV</span>' : '';
+        div.innerHTML = `${poster}
+            <div class="search-meta">
+                <div class="search-title">${escapeHtml(m.Title)}${tv}</div>
+                ${year}
+            </div>`;
+        // Some OMDB poster URLs are present but dead; swap in the same
+        // placeholder rather than leaving a broken-image icon.
+        div.querySelector('img.search-poster')?.addEventListener('error', function () {
+            const fallback = document.createElement('div');
+            fallback.className = 'search-poster search-poster-empty';
+            fallback.textContent = 'No poster';
+            this.replaceWith(fallback);
+        });
         div.onclick = () => addToVault(m.imdbID);
         resultsDiv.appendChild(div);
     });
