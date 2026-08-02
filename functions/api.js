@@ -22,6 +22,12 @@ function daysAgoISO(days) {
   return new Date(Date.now() - days * 86400000).toISOString().split('T')[0];
 }
 
+// Tolerate the usual paste damage: surrounding whitespace or a trailing
+// newline, and a "Bearer " prefix copied along with the token.
+function normaliseKey(raw) {
+  return String(raw).trim().replace(/^Bearer\s+/i, '').trim();
+}
+
 // TMDB issues two credential types: a v3 API key (query param) and a v4 read
 // access token (bearer, a JWT). Accept either so it works with whichever the
 // dashboard hands out.
@@ -48,7 +54,13 @@ async function fetchFreshFromTmdb(key) {
     'vote_average.gte': '6',
     include_adult: 'false',
   }, key);
-  if (!res.ok) throw new Error(`TMDB discover failed: ${res.status}`);
+  if (!res.ok) {
+    // Logged (never the key itself) so `wrangler pages deployment tail` can
+    // tell a rejected credential from a malformed query.
+    const body = await res.text().catch(() => '');
+    console.log(`TMDB discover failed: HTTP ${res.status} ${body.slice(0, 200)}`);
+    throw new Error(`TMDB discover failed: ${res.status}`);
+  }
   const { results = [] } = await res.json();
 
   // discover returns TMDB ids; this library is keyed on imdb_id, so resolve
@@ -79,8 +91,13 @@ async function fetchFreshFromTmdb(key) {
 }
 
 async function getFresh(env) {
-  const key = env.TMDB_API_KEY;
-  if (!key) return { error: 'TMDB_API_KEY is not configured' };
+  const key = env.TMDB_API_KEY ? normaliseKey(env.TMDB_API_KEY) : '';
+  if (!key) {
+    console.log('TMDB_API_KEY is missing or empty on this deployment');
+    return { error: 'TMDB_API_KEY is not configured' };
+  }
+  // Shape only, never the value: 32 hex chars = v3 key, eyJ… = v4 token.
+  console.log(`TMDB key present: length=${key.length} looksLikeV4=${key.startsWith('eyJ')}`);
 
   const cached = await env.DB.prepare(
     'SELECT payload, fetched_at FROM fresh_cache WHERE id = ?'
