@@ -11,7 +11,7 @@ Personal movie library PWA for Daniel. Deployed via Cloudflare Pages.
 
 ## Database
 
-Single table: `movies`. Schema lives in `migrations/0001_init.sql`; `migrations/0002_seed.sql` is the one-time import of the 55 rows migrated off Supabase.
+Two tables. `movies` is the library — schema in `migrations/0001_init.sql`, with `migrations/0002_seed.sql` the one-time import of the 55 rows migrated off Supabase. `fresh_cache` (`migrations/0003_fresh_cache.sql`) holds the cached TMDB "fresh finds" payload.
 
 | Column | Type | Notes |
 |---|---|---|
@@ -68,6 +68,7 @@ All on `/api?type=...`. `auth`, `search`, and `detail` are unauthenticated; ever
 | `upsert` | POST | Insert movie, or refresh metadata if it exists (never overwrites `status`) |
 | `status` | POST | Change status; manages `watched_at` |
 | `delete` | POST | Remove by `imdb_id` |
+| `fresh` | GET | Recent digitally-released films from TMDB, minus anything already in the library |
 
 All SQL uses prepared statements with bound parameters.
 
@@ -81,7 +82,7 @@ All SQL uses prepared statements with bound parameters.
 
 ## Local development
 
-`.dev.vars` holds `OMDB_API_KEY` and `VAULT_PIN` for local runs. It is gitignored — do not commit it.
+`.dev.vars` holds `OMDB_API_KEY`, `VAULT_PIN` and `TMDB_API_KEY` for local runs. It is gitignored — do not commit it.
 
 ```bash
 npx wrangler pages dev .
@@ -91,5 +92,6 @@ npx wrangler pages dev .
 
 - Local files and the GitHub remote can drift — always check `git fetch && git diff origin/main HEAD` before making changes
 - The app is installed as a PWA on Daniel's phone; cache clears require deleting and re-adding the home screen icon
-- Secrets (`OMDB_API_KEY`, `VAULT_PIN`) are set in the Cloudflare Pages project settings, not in `wrangler.toml`
+- Secrets (`OMDB_API_KEY`, `VAULT_PIN`, `TMDB_API_KEY`) are set in the Cloudflare Pages project settings, not in `wrangler.toml`
+- Without `TMDB_API_KEY` the `fresh` endpoint returns 503 and the Fresh Finds strip hides itself; the rest of the app is unaffected
 - `wrangler.toml` carries the D1 `database_id`; it is a non-secret identifier and is safe to commit

@@ -83,11 +83,62 @@ async function liveSearch(query) {
     });
 }
 
+// Fresh finds: recent, digitally-released films not already in the library.
+// Failures stay silent — this is a discovery extra, not core to the app.
+async function fetchFresh() {
+    const block = document.getElementById('freshBlock');
+    const strip = document.getElementById('freshList');
+    strip.innerHTML = Array(5).fill(
+        '<div class="fresh-card skeleton-shimmer" style="height:250px;"></div>'
+    ).join('');
+
+    let films;
+    try {
+        films = await api('fresh');
+    } catch {
+        block.classList.remove('visible');
+        return;
+    }
+    if (!Array.isArray(films) || films.length === 0) {
+        block.classList.remove('visible');
+        return;
+    }
+
+    block.classList.add('visible');
+    strip.innerHTML = '';
+    films.forEach((f) => {
+        const div = document.createElement('div');
+        div.className = 'fresh-card';
+        div.id = `fresh-${f.imdb_id}`;
+        const poster = f.poster
+            ? `<img src="${escapeHtml(f.poster)}" class="fresh-poster" loading="lazy">`
+            : '<div class="fresh-poster fresh-poster-empty">No poster</div>';
+        const rating = f.rating
+            ? `<span class="card-rating">${STAR_SVG}${escapeHtml(f.rating)}</span>`
+            : '';
+        div.innerHTML = `${poster}
+            <div class="fresh-meta">
+                <div class="fresh-title">${escapeHtml(f.title)}</div>
+                <div class="fresh-sub">${escapeHtml(f.year || '')}${rating}</div>
+            </div>`;
+        div.querySelector('img.fresh-poster')?.addEventListener('error', function () {
+            const fallback = document.createElement('div');
+            fallback.className = 'fresh-poster fresh-poster-empty';
+            fallback.textContent = 'No poster';
+            this.replaceWith(fallback);
+        });
+        div.onclick = () => addToVault(f.imdb_id);
+        strip.appendChild(div);
+    });
+}
+
 async function fetchMovies() {
     const data = await api('list');
     if (!Array.isArray(data)) return;
     cachedMovies = data;
     render(sortMovies(data));
+    // Re-run after each library change so anything just added drops out.
+    fetchFresh();
 }
 
 function sortMovies(movies) {

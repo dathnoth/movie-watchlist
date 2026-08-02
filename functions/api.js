@@ -12,6 +12,106 @@ function json(body, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: JSON_HEADERS });
 }
 
+// Fresh finds: recent, well-rated films that have left their theatrical window.
+const FRESH_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const FRESH_WINDOW_DAYS = 90;
+const FRESH_REGION = 'GB';
+const FRESH_LIMIT = 20;
+
+function daysAgoISO(days) {
+  return new Date(Date.now() - days * 86400000).toISOString().split('T')[0];
+}
+
+// TMDB issues two credential types: a v3 API key (query param) and a v4 read
+// access token (bearer, a JWT). Accept either so it works with whichever the
+// dashboard hands out.
+function tmdbFetch(path, params, key) {
+  const url = new URL(`https://api.themoviedb.org/3/${path}`);
+  for (const [k, v] of Object.entries(params || {})) url.searchParams.set(k, v);
+  const headers = { Accept: 'application/json' };
+  if (key.startsWith('eyJ')) headers.Authorization = `Bearer ${key}`;
+  else url.searchParams.set('api_key', key);
+  return fetch(url, { headers });
+}
+
+async function fetchFreshFromTmdb(key) {
+  // release_type 4|5|6 = digital | physical | TV, i.e. past the theatrical
+  // window. Paired with region so the dates are that region's releases.
+  const res = await tmdbFetch('discover/movie', {
+    region: FRESH_REGION,
+    language: 'en-GB',
+    sort_by: 'vote_average.desc',
+    with_release_type: '4|5|6',
+    'release_date.gte': daysAgoISO(FRESH_WINDOW_DAYS),
+    'release_date.lte': daysAgoISO(0),
+    'vote_count.gte': '50',
+    'vote_average.gte': '6.5',
+    include_adult: 'false',
+  }, key);
+  if (!res.ok) throw new Error(`TMDB discover failed: ${res.status}`);
+  const { results = [] } = await res.json();
+
+  // discover returns TMDB ids; this library is keyed on imdb_id, so resolve
+  // each one. Films without an IMDb id are dropped rather than guessed at.
+  const detailed = await Promise.all(
+    results.slice(0, FRESH_LIMIT).map(async (m) => {
+      try {
+        const r = await tmdbFetch(`movie/${m.id}/external_ids`, {}, key);
+        if (!r.ok) return null;
+        const { imdb_id } = await r.json();
+        if (!imdb_id) return null;
+        return {
+          imdb_id,
+          title: m.title,
+          year: (m.release_date || '').slice(0, 4),
+          rating: m.vote_average ? m.vote_average.toFixed(1) : null,
+          poster: m.poster_path
+            ? `https://image.tmdb.org/t/p/w342${m.poster_path}`
+            : null,
+        };
+      } catch {
+        return null;
+      }
+    })
+  );
+
+  return detailed.filter(Boolean);
+}
+
+async function getFresh(env) {
+  const key = env.TMDB_API_KEY;
+  if (!key) return { error: 'TMDB_API_KEY is not configured' };
+
+  const cached = await env.DB.prepare(
+    'SELECT payload, fetched_at FROM fresh_cache WHERE id = ?'
+  ).bind('discover').first();
+
+  const isStale = !cached || Date.now() - Date.parse(cached.fetched_at) > FRESH_TTL_MS;
+
+  let films;
+  if (isStale) {
+    try {
+      films = await fetchFreshFromTmdb(key);
+      await env.DB.prepare(
+        `INSERT INTO fresh_cache (id, payload, fetched_at) VALUES (?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET payload = excluded.payload, fetched_at = excluded.fetched_at`
+      ).bind('discover', JSON.stringify(films), new Date().toISOString()).run();
+    } catch (err) {
+      // Serve a stale cache rather than an empty page if TMDB is unreachable.
+      if (!cached) return { error: String(err.message || err) };
+      films = JSON.parse(cached.payload);
+    }
+  } else {
+    films = JSON.parse(cached.payload);
+  }
+
+  // Filtered per request, not at cache time, so it stays correct as the
+  // library grows between refreshes.
+  const { results: owned } = await env.DB.prepare('SELECT imdb_id FROM movies').all();
+  const have = new Set(owned.map((r) => r.imdb_id));
+  return { films: films.filter((f) => !have.has(f.imdb_id)) };
+}
+
 export async function onRequest(context) {
   const { request, env } = context;
   const { searchParams } = new URL(request.url);
@@ -48,6 +148,11 @@ export async function onRequest(context) {
       'SELECT * FROM movies ORDER BY title COLLATE NOCASE'
     ).all();
     return json(results.map((m) => ({ ...m, is_tv_show: !!m.is_tv_show })));
+  }
+
+  if (type === 'fresh') {
+    const result = await getFresh(env);
+    return result.error ? json(result, 503) : json(result.films);
   }
 
   if (type === 'upsert' && request.method === 'POST') {
