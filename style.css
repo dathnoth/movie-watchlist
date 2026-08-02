@@ -18,6 +18,33 @@ body {
 
 body.modal-open { overflow: hidden; }
 
+/*
+ * Cinema motifs, kept deliberately faint.
+ * .projector-beam: light spilling from a projection booth down over the header.
+ * .vignette: the corner falloff of a projected image.
+ * Both are non-interactive overlays; the beam scrolls away, the vignette is fixed.
+ */
+.projector-beam {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+    width: min(150%, 1100px); height: 420px;
+    pointer-events: none; z-index: 0;
+    background:
+        radial-gradient(60% 70% at 50% 0%, rgba(56, 189, 248, 0.10), transparent 70%),
+        radial-gradient(38% 55% at 50% 0%, rgba(226, 240, 255, 0.07), transparent 72%);
+    filter: blur(6px);
+}
+
+.vignette {
+    position: fixed; inset: 0; pointer-events: none; z-index: 1;
+    background: radial-gradient(115% 85% at 50% 42%, transparent 55%, rgba(0, 0, 0, 0.42));
+}
+
+/* Anchors the absolutely-positioned beam. */
+#mainApp { position: relative; }
+
+/* Keep real content above the overlays, without clobbering their positioning. */
+#mainApp > *:not(.projector-beam):not(.vignette) { position: relative; z-index: 2; }
+
 .content-wrapper {
     max-width: 1200px;
     margin: 0 auto;
@@ -158,6 +185,11 @@ h2 { font-size: 1.1rem; font-weight: 900; letter-spacing: 1px; color: var(--text
 
 .archive-list { display: flex; flex-direction: column; gap: 6px; }
 
+/*
+ * A watched film is a torn ticket: notches punched into both edges, with a
+ * dashed tear line before the rating stub. The notches are masked out rather
+ * than drawn, so they read against whatever is behind the row.
+ */
 .archive-row {
     display: flex; align-items: center; gap: 14px;
     padding: 8px 12px; border-radius: 10px;
@@ -165,14 +197,41 @@ h2 { font-size: 1.1rem; font-weight: 900; letter-spacing: 1px; color: var(--text
     border: 1px solid rgba(255,255,255,0.04);
     cursor: pointer; position: relative;
     transition: background 0.2s, border-color 0.2s;
+    --notch: 7px;
+    -webkit-mask:
+        radial-gradient(var(--notch) at 0 50%, transparent 99%, #000 100%) left / 100% 100% no-repeat,
+        radial-gradient(var(--notch) at 100% 50%, transparent 99%, #000 100%) right / 100% 100% no-repeat;
+    -webkit-mask-composite: source-in;
+    mask:
+        radial-gradient(var(--notch) at 0 50%, transparent 99%, #000 100%) left / 100% 100% no-repeat,
+        radial-gradient(var(--notch) at 100% 50%, transparent 99%, #000 100%) right / 100% 100% no-repeat;
+    mask-composite: intersect;
 }
 .archive-row:hover { background: rgba(56,189,248,0.06); border-color: rgba(56,189,248,0.2); }
+
+/* Perforated tear line separating the rating stub. */
+.archive-row .archive-rating {
+    padding-left: 14px;
+    border-left: 1px dashed rgba(255, 255, 255, 0.16);
+}
 
 .archive-thumb { width: 34px; height: 51px; object-fit: cover; border-radius: 4px; flex-shrink: 0; background: #1e293b; }
 .archive-main { flex: 1; min-width: 0; }
 .archive-title { font-size: 0.85rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .archive-meta { font-size: 0.7rem; color: #64748b; margin-top: 3px; display: flex; gap: 10px; flex-wrap: wrap; }
 .archive-rating { font-size: 0.75rem; color: #fbbf24; font-weight: 700; flex-shrink: 0; }
+
+/* Inline star, replacing the emoji that rendered differently per platform. */
+.star-icon {
+    width: 1em; height: 1em; fill: currentColor;
+    vertical-align: -0.12em; margin-right: 0.32em;
+}
+.card-rating, .archive-rating, .modal-rating {
+    display: inline-flex; align-items: center; color: #fbbf24;
+    font-weight: 700; white-space: nowrap;
+}
+.card-rating { font-size: 0.75rem; }
+.modal-rating { color: inherit; }
 .archive-date { color: #7c8da5; white-space: nowrap; }
 
 .tv-badge-inline {

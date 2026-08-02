@@ -132,11 +132,14 @@ function cardHtml(m) {
                 <span class="genre-tag">${escapeHtml(m.genre)}</span>
                 <div style="display:flex; justify-content:space-between; align-items:center;">
                     <span class="runtime-text">${escapeHtml(m.runtime)}</span>
-                    <span style="color:#fbbf24; font-size:0.75rem; font-weight:bold;">⭐ ${escapeHtml(m.rating)}</span>
+                    <span class="card-rating">${STAR_SVG}${escapeHtml(m.rating)}</span>
                 </div>
             </div>
         </div>`;
 }
+
+// Inline so the star renders identically everywhere, unlike the emoji it replaces.
+const STAR_SVG = '<svg class="star-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.6l2.9 5.9 6.5.95-4.7 4.58 1.11 6.47L12 17.44l-5.81 3.06 1.11-6.47-4.7-4.58 6.5-.95z"/></svg>';
 
 function archiveRowHtml(m) {
     const year = (m.year || '').match(/\d{4}/)?.[0] || '';
@@ -151,7 +154,7 @@ function archiveRowHtml(m) {
                     ${m.watched_at ? `<span class="archive-date">Watched ${formatWatchedDate(m.watched_at)}</span>` : ''}
                 </div>
             </div>
-            <span class="archive-rating">⭐ ${escapeHtml(m.rating)}</span>
+            <span class="archive-rating">${STAR_SVG}${escapeHtml(m.rating)}</span>
             <button class="archive-remove" onclick="event.stopPropagation(); deleteMovie('${m.imdb_id}')">✕</button>
         </div>`;
 }
@@ -251,7 +254,7 @@ async function showDetails(id) {
             <div style="flex:1; width: 100%;">
                 <h2 style="font-size:1.7rem; color:white; margin:0 0 5px 0;">${escapeHtml(d.Title)}</h2>
                 <div style="color:var(--accent); font-weight:bold; margin-bottom:15px; font-size:0.85rem;">
-                    ${escapeHtml(d.Released)} • ${escapeHtml(d.Runtime)} • ⭐ ${escapeHtml(d.imdbRating)}
+                    ${escapeHtml(d.Released)} • ${escapeHtml(d.Runtime)} • <span class="modal-rating">${STAR_SVG}${escapeHtml(d.imdbRating)}</span>
                 </div>
                 ${local ? `<span class="status-pill status-${local.status}">${STATUS_LABELS[local.status]}</span>` : ''}
                 <div class="modal-info-label">Plot Summary</div>
