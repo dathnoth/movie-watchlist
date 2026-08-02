@@ -101,7 +101,7 @@ input { width: 100%; padding: 18px 24px; border-radius: 20px; border: 1px solid 
  * Fresh Finds: a horizontal strip above the GET list. Hidden until it has
  * something to show, so a missing TMDB key leaves no empty shell behind.
  */
-.fresh-block { display: none; margin-bottom: 30px; }
+.fresh-block { display: none; margin-top: 34px; }
 .fresh-block.visible { display: block; }
 .fresh-heading { font-size: 0.9rem; }
 .fresh-credit { font-size: 0.62rem; color: #475569; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; }
