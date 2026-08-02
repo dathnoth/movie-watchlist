@@ -45,7 +45,7 @@ async function fetchFreshFromTmdb(key) {
     'release_date.gte': daysAgoISO(FRESH_WINDOW_DAYS),
     'release_date.lte': daysAgoISO(0),
     'vote_count.gte': '50',
-    'vote_average.gte': '6.5',
+    'vote_average.gte': '6',
     include_adult: 'false',
   }, key);
   if (!res.ok) throw new Error(`TMDB discover failed: ${res.status}`);
