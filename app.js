@@ -2,6 +2,7 @@ let debounceTimer;
 let currentSort = 'title';
 let currentView = 'got';
 let cachedMovies = [];
+let freshFilms = [];
 
 const STATUS_LABELS = { get: 'Get', got: 'Got', archive: 'Archive' };
 
@@ -65,7 +66,14 @@ async function liveSearch(query) {
             : '';
         // Matches how the library flags TV: series only, movies get no marker.
         const tv = m.Type === 'series' ? ' <span class="tv-badge-inline">TV</span>' : '';
-        div.innerHTML = `${poster}
+        // Flag anything already saved, so you can see at a glance that a
+        // result is on the drive, wanted, or already watched.
+        const existing = cachedMovies.find((x) => x.imdb_id === m.imdbID);
+        const owned = existing
+            ? `<div class="search-owned status-${existing.status}">${STATUS_LABELS[existing.status]}</div>`
+            : '';
+        if (existing) div.classList.add('is-owned');
+        div.innerHTML = `${poster}${owned}
             <div class="search-meta">
                 <div class="search-title">${escapeHtml(m.Title)}${tv}</div>
                 ${year}
@@ -87,8 +95,8 @@ async function liveSearch(query) {
 // Failures stay silent — this is a discovery extra, not core to the app.
 async function fetchFresh() {
     const block = document.getElementById('freshBlock');
-    const strip = document.getElementById('freshList');
-    strip.innerHTML = Array(5).fill(
+    const grid = document.getElementById('freshList');
+    grid.innerHTML = Array(6).fill(
         '<div class="fresh-card skeleton-shimmer" style="height:250px;"></div>'
     ).join('');
 
@@ -104,9 +112,63 @@ async function fetchFresh() {
         return;
     }
 
+    freshFilms = films;
     block.classList.add('visible');
-    strip.innerHTML = '';
-    films.forEach((f) => {
+    populateFreshFilters(films);
+    renderFresh();
+}
+
+// Filter options come from the results themselves, so they never offer a
+// choice that would return nothing.
+function populateFreshFilters(films) {
+    const years = [...new Set(films.map((f) => f.year).filter(Boolean))].sort().reverse();
+    const genres = [...new Set(films.flatMap((f) => f.genres || []))].sort();
+
+    const fill = (id, blank, values) => {
+        const sel = document.getElementById(id);
+        const previous = sel.value;
+        sel.innerHTML = `<option value="">${blank}</option>`
+            + values.map((v) => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');
+        if (values.includes(previous)) sel.value = previous;
+    };
+
+    fill('freshYear', 'Any year', years);
+    fill('freshGenre', 'Any genre', genres);
+}
+
+function renderFresh() {
+    const grid = document.getElementById('freshList');
+    const year = document.getElementById('freshYear').value;
+    const genre = document.getElementById('freshGenre').value;
+    const runtime = document.getElementById('freshRuntime').value;
+    const minRating = parseFloat(document.getElementById('freshRating').value) || 0;
+
+    const [minLen, maxLen] = runtime ? runtime.split('-').map(Number) : [0, Infinity];
+
+    const visible = freshFilms.filter((f) => {
+        if (year && f.year !== year) return false;
+        if (genre && !(f.genres || []).includes(genre)) return false;
+        if (minRating && parseFloat(f.rating || 0) < minRating) return false;
+        // Unknown runtime is only excluded once a length filter is chosen.
+        if (runtime) {
+            if (!f.runtime) return false;
+            if (f.runtime < minLen || f.runtime >= maxLen) return false;
+        }
+        return true;
+    });
+
+    document.getElementById('freshCount').textContent = visible.length;
+    document.getElementById('freshReset').classList.toggle(
+        'active', Boolean(year || genre || runtime || minRating)
+    );
+
+    if (visible.length === 0) {
+        grid.innerHTML = '<p class="empty-state">Nothing matches those filters.</p>';
+        return;
+    }
+
+    grid.innerHTML = '';
+    visible.forEach((f) => {
         const div = document.createElement('div');
         div.className = 'fresh-card';
         div.id = `fresh-${f.imdb_id}`;
@@ -116,10 +178,11 @@ async function fetchFresh() {
         const rating = f.rating
             ? `<span class="card-rating">${STAR_SVG}${escapeHtml(f.rating)}</span>`
             : '';
+        const meta = [f.year, f.runtime ? `${f.runtime} min` : null].filter(Boolean).join(' • ');
         div.innerHTML = `${poster}
             <div class="fresh-meta">
                 <div class="fresh-title">${escapeHtml(f.title)}</div>
-                <div class="fresh-sub">${escapeHtml(f.year || '')}${rating}</div>
+                <div class="fresh-sub"><span>${escapeHtml(meta)}</span>${rating}</div>
             </div>`;
         div.querySelector('img.fresh-poster')?.addEventListener('error', function () {
             const fallback = document.createElement('div');
@@ -128,8 +191,14 @@ async function fetchFresh() {
             this.replaceWith(fallback);
         });
         div.onclick = () => showDetails(f.imdb_id);
-        strip.appendChild(div);
+        grid.appendChild(div);
     });
+}
+
+function resetFreshFilters() {
+    ['freshYear', 'freshGenre', 'freshRuntime', 'freshRating']
+        .forEach((id) => { document.getElementById(id).value = ''; });
+    renderFresh();
 }
 
 async function fetchMovies() {

@@ -40,6 +40,44 @@ function tmdbFetch(path, params, key) {
   return fetch(url, { headers });
 }
 
+// Returns OMDB-shaped results so the client renderer is unchanged.
+async function searchTmdb(query, key) {
+  const res = await tmdbFetch('search/multi', {
+    query,
+    include_adult: 'false',
+    language: 'en-GB',
+  }, key);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const { results = [] } = await res.json();
+
+  const items = results
+    .filter((r) => r.media_type === 'movie' || r.media_type === 'tv')
+    .slice(0, 12);
+
+  const mapped = await Promise.all(items.map(async (r) => {
+    try {
+      const ext = await tmdbFetch(`${r.media_type}/${r.id}/external_ids`, {}, key);
+      if (!ext.ok) return null;
+      const { imdb_id } = await ext.json();
+      if (!imdb_id) return null;
+      const date = r.release_date || r.first_air_date || '';
+      return {
+        imdbID: imdb_id,
+        Title: r.title || r.name,
+        Year: date.slice(0, 4),
+        Poster: r.poster_path
+          ? `https://image.tmdb.org/t/p/w342${r.poster_path}`
+          : 'N/A',
+        Type: r.media_type === 'tv' ? 'series' : 'movie',
+      };
+    } catch {
+      return null;
+    }
+  }));
+
+  return mapped.filter(Boolean);
+}
+
 async function fetchFreshFromTmdb(key) {
   // release_type 4|5|6 = digital | physical | TV, i.e. past the theatrical
   // window. Paired with region so the dates are that region's releases.
@@ -65,18 +103,26 @@ async function fetchFreshFromTmdb(key) {
 
   // discover returns TMDB ids; this library is keyed on imdb_id, so resolve
   // each one. Films without an IMDb id are dropped rather than guessed at.
+  // The full movie record (rather than just external_ids) is one request
+  // either way and also carries runtime and genres, which the filters need.
   const detailed = await Promise.all(
     results.slice(0, FRESH_LIMIT).map(async (m) => {
       try {
-        const r = await tmdbFetch(`movie/${m.id}/external_ids`, {}, key);
+        const r = await tmdbFetch(`movie/${m.id}`, {
+          append_to_response: 'external_ids',
+          language: 'en-GB',
+        }, key);
         if (!r.ok) return null;
-        const { imdb_id } = await r.json();
+        const full = await r.json();
+        const imdb_id = full.imdb_id || full.external_ids?.imdb_id;
         if (!imdb_id) return null;
         return {
           imdb_id,
           title: m.title,
           year: (m.release_date || '').slice(0, 4),
           rating: m.vote_average ? m.vote_average.toFixed(1) : null,
+          runtime: full.runtime || null,
+          genres: (full.genres || []).map((g) => g.name),
           poster: m.poster_path
             ? `https://image.tmdb.org/t/p/w342${m.poster_path}`
             : null,
@@ -147,12 +193,29 @@ export async function onRequest(context) {
       : json({ ok: false }, 401);
   }
 
-  if (type === 'search' || type === 'detail') {
-    const key = env.OMDB_API_KEY;
-    const url = type === 'search'
-      ? `https://www.omdbapi.com/?s=${encodeURIComponent(searchParams.get('q'))}&apikey=${key}`
-      : `https://www.omdbapi.com/?i=${encodeURIComponent(searchParams.get('id'))}&apikey=${key}&plot=short`;
-    const res = await fetch(url);
+  // Search runs through TMDB: OMDB only matches from the start of a word, so
+  // "matr" or "unner" return nothing. Falls back to OMDB if TMDB is
+  // unavailable. The response keeps OMDB's shape either way.
+  if (type === 'search') {
+    const q = searchParams.get('q') || '';
+    const tmdbKey = env.TMDB_API_KEY ? normaliseKey(env.TMDB_API_KEY) : '';
+    if (tmdbKey) {
+      try {
+        return json({ Search: await searchTmdb(q, tmdbKey) });
+      } catch (err) {
+        console.log(`TMDB search failed, falling back to OMDB: ${err.message}`);
+      }
+    }
+    const res = await fetch(
+      `https://www.omdbapi.com/?s=${encodeURIComponent(q)}&apikey=${env.OMDB_API_KEY}`
+    );
+    return json(await res.json());
+  }
+
+  if (type === 'detail') {
+    const res = await fetch(
+      `https://www.omdbapi.com/?i=${encodeURIComponent(searchParams.get('id'))}&apikey=${env.OMDB_API_KEY}&plot=short`
+    );
     return json(await res.json());
   }
 

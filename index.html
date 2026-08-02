@@ -71,10 +71,27 @@
 
                     <section id="freshBlock" class="fresh-block">
                         <div class="section-header">
-                            <h2 class="section-count fresh-heading">Fresh Finds</h2>
-                            <span class="fresh-credit">Data from TMDB</span>
+                            <h2 class="section-count fresh-heading"><span id="freshCount">0</span> Fresh Finds</h2>
                         </div>
-                        <div id="freshList" class="fresh-strip"></div>
+                        <div class="fresh-filters">
+                            <select id="freshYear" class="fresh-filter" onchange="renderFresh()"></select>
+                            <select id="freshGenre" class="fresh-filter" onchange="renderFresh()"></select>
+                            <select id="freshRuntime" class="fresh-filter" onchange="renderFresh()">
+                                <option value="">Any length</option>
+                                <option value="0-90">Under 90 min</option>
+                                <option value="90-120">90–120 min</option>
+                                <option value="120-999">Over 120 min</option>
+                            </select>
+                            <select id="freshRating" class="fresh-filter" onchange="renderFresh()">
+                                <option value="">Any rating</option>
+                                <option value="6">6+</option>
+                                <option value="7">7+</option>
+                                <option value="8">8+</option>
+                            </select>
+                            <button id="freshReset" class="fresh-filter fresh-reset" onclick="resetFreshFilters()">Reset</button>
+                        </div>
+                        <div id="freshList" class="fresh-grid"></div>
+                        <p class="fresh-credit">Film data from TMDB</p>
                     </section>
                 </div>
             </section>

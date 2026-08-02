@@ -62,7 +62,7 @@ All on `/api?type=...`. `auth`, `search`, and `detail` are unauthenticated; ever
 | type | Method | Purpose |
 |---|---|---|
 | `auth` | POST | Validate PIN |
-| `search` | GET | OMDB title search |
+| `search` | GET | Title search via TMDB (partial/mid-word capable), falling back to OMDB if TMDB is unavailable; returns OMDB-shaped results |
 | `detail` | GET | OMDB detail by IMDb id |
 | `list` | GET | All movies, sorted by title |
 | `upsert` | POST | Insert movie, or refresh metadata if it exists (never overwrites `status`) |
@@ -78,7 +78,7 @@ All SQL uses prepared statements with bound parameters.
 - **Sorting** — title / release date / rating / runtime, applies to the poster grids
 - **Archive** — compact list rows: thumbnail, title, year·runtime, watched date, rating
 - **Movie roulette** — random pick from GOT only; hidden on other tabs
-- **Search** — OMDB via the Function proxy, debounced 300ms
+- **Search** — TMDB via the Function proxy, debounced 300ms; results already in the library are badged with their status
 
 ## Local development
 
