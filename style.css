@@ -42,8 +42,16 @@ body.modal-open { overflow: hidden; }
 /* Anchors the absolutely-positioned beam. */
 #mainApp { position: relative; }
 
-/* Keep real content above the overlays, without clobbering their positioning. */
-#mainApp > *:not(.projector-beam):not(.vignette) { position: relative; z-index: 2; }
+/*
+ * Lift content above the vignette. Listed explicitly rather than as a blanket
+ * child rule: a wildcard here also matched .bottom-bar and overrode its
+ * position:fixed, dropping the floating bar to the end of the document.
+ * .bottom-bar and #detailsModal carry their own stacking and are left alone.
+ */
+#mainApp > .header-area,
+#mainApp > .search-drawer,
+#mainApp > #msg,
+#mainApp > .lists-container { position: relative; z-index: 2; }
 
 .content-wrapper {
     max-width: 1200px;
