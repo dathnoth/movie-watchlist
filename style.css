@@ -169,12 +169,13 @@ input { width: 100%; padding: 18px 24px; border-radius: 20px; border: 1px solid 
 .view-panel { display: none; width: 100%; padding: 30px 0 calc(120px + env(safe-area-inset-bottom, 0px)) 0; }
 .view-panel.active { display: block; }
 
-.section-header { display: flex; justify-content: space-between; align-items: center; gap: 15px; margin-bottom: 22px; flex-wrap: wrap; }
+/* Count and sort share a single row; the sort strip scrolls if space runs out. */
+.section-header {
+    display: flex; justify-content: space-between; align-items: center;
+    gap: 12px; margin-bottom: 22px; flex-wrap: nowrap;
+}
 h2 { font-size: 1.1rem; font-weight: 900; letter-spacing: 1px; color: var(--text); margin: 0; }
-.section-hint { font-size: 0.78rem; color: #64748b; margin: 0; }
 
-/* Per-list count, replacing the badges that used to sit in the tab bar. */
-.section-intro { display: flex; flex-direction: column; gap: 4px; }
 .section-count {
     font-size: 1rem; font-weight: 900; letter-spacing: 0.6px;
     text-transform: uppercase; color: var(--text); margin: 0;
@@ -184,8 +185,12 @@ h2 { font-size: 1.1rem; font-weight: 900; letter-spacing: 1px; color: var(--text
 
 .empty-state { color: #475569; font-size: 0.85rem; padding: 10px 0; margin: 0; }
 
-.sort-container { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
-.sort-btn { background: var(--card); border: 1px solid rgba(255,255,255,0.05); color: #94a3b8; padding: 10px 14px; border-radius: 8px; font-size: 0.7rem; font-weight: 700; cursor: pointer; min-height: 44px; transition: background 0.2s, color 0.2s, border-color 0.2s; }
+.sort-container {
+    display: flex; gap: 6px; flex-wrap: nowrap; justify-content: flex-end;
+    overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch;
+}
+.sort-container::-webkit-scrollbar { display: none; }
+.sort-btn { background: var(--card); border: 1px solid rgba(255,255,255,0.05); color: #94a3b8; padding: 10px 14px; border-radius: 8px; font-size: 0.7rem; font-weight: 700; cursor: pointer; min-height: 44px; white-space: nowrap; flex: none; transition: background 0.2s, color 0.2s, border-color 0.2s; }
 .sort-btn:hover { background: rgba(56,189,248,0.08); color: var(--accent); border-color: rgba(56,189,248,0.3); }
 .sort-btn.active { background: var(--accent); color: #0b0f19; }
 
