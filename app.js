@@ -127,7 +127,7 @@ async function fetchFresh() {
             fallback.textContent = 'No poster';
             this.replaceWith(fallback);
         });
-        div.onclick = () => addToVault(f.imdb_id);
+        div.onclick = () => showDetails(f.imdb_id);
         strip.appendChild(div);
     });
 }
@@ -226,8 +226,10 @@ function render(movies) {
     document.getElementById('archiveCount').textContent = buckets.archive.length;
 }
 
-async function addToVault(id) {
-    const card = document.getElementById(`search-${id}`);
+// `status` is explicit when adding from the modal; otherwise it follows
+// whichever tab you are on, as it does when tapping a search result.
+async function addToVault(id, status) {
+    const card = document.getElementById(`search-${id}`) || document.getElementById(`fresh-${id}`);
     if (card) card.classList.add('added-state');
 
     const res = await fetch(`/api?type=detail&id=${id}`);
@@ -242,7 +244,7 @@ async function addToVault(id) {
             runtime: d.Runtime,
             rating: d.imdbRating,
             genre: d.Genre,
-            status: currentView === 'get' ? 'get' : 'got',
+            status: status || (currentView === 'get' ? 'get' : 'got'),
             is_tv_show: d.Type === 'series',
         },
     });
@@ -260,7 +262,17 @@ function statusActions(id, status) {
     if (status === 'get') return btn('got', 'Got It', 'btn-got');
     if (status === 'got') return btn('archive', 'Watched', 'btn-watched') + btn('get', 'Not On Drive', 'btn-restore');
     if (status === 'archive') return btn('got', 'Restore', 'btn-restore');
-    return btn('get', 'Add to Get', 'btn-got');
+    // Not in the library yet, so this has to insert the row. updateStatus runs
+    // an UPDATE, which would match nothing and fail silently.
+    return `<button id="addCta-${id}" onclick="addFromModal('${id}')" class="modal-btn btn-got">Add to Get</button>`;
+}
+
+async function addFromModal(id) {
+    const btn = document.getElementById(`addCta-${id}`);
+    if (btn) { btn.textContent = 'Adding…'; btn.disabled = true; }
+    await addToVault(id, 'get');
+    if (btn) btn.textContent = 'Added';
+    setTimeout(closeModal, 500);
 }
 
 async function showDetails(id) {
