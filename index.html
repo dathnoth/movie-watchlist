@@ -111,9 +111,17 @@
                 <button class="view-tab active" data-view="got" onclick="setView('got')">Got</button>
                 <button class="view-tab" data-view="get" onclick="setView('get')">Get</button>
                 <button class="view-tab" data-view="archive" onclick="setView('archive')">Archive</button>
-                <span class="bottom-bar-divider" aria-hidden="true"></span>
-                <button id="addBtn" onclick="toggleSearch()" aria-label="Add a movie">＋</button>
             </div>
+            <button id="addBtn" onclick="toggleSearch()" aria-label="Search for a movie">
+                <svg class="icon-search" viewBox="0 0 24 24" aria-hidden="true">
+                    <circle cx="11" cy="11" r="7"></circle>
+                    <line x1="16.5" y1="16.5" x2="21" y2="21"></line>
+                </svg>
+                <svg class="icon-close" viewBox="0 0 24 24" aria-hidden="true">
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                </svg>
+            </button>
         </nav>
 
         <div id="detailsModal" onclick="closeModal()">

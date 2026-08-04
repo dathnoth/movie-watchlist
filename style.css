@@ -205,42 +205,40 @@ select.fresh-filter {
     z-index: 20;
 }
 
-/* Floating bottom bar: view tabs + add button, thumb-reachable on phones */
+/*
+ * Floating bottom bar: a text-only pill of view tabs, with the search button
+ * as a separate circle alongside it rather than tucked inside.
+ */
 .bottom-bar {
     position: fixed; z-index: 1000;
     left: 50%; transform: translateX(-50%);
     bottom: calc(18px + env(safe-area-inset-bottom, 0px));
     width: calc(100% - 32px); max-width: 520px;
+    display: flex; align-items: center; gap: 10px;
 }
 .bottom-bar-inner {
-    display: flex; align-items: center; gap: 4px; padding: 6px;
+    flex: 1; min-width: 0;
+    display: flex; align-items: center; gap: 4px; padding: 5px;
     background: rgba(15, 23, 42, 0.82);
     backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
     border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 18px;
+    border-radius: 999px;
     box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
 }
 
 .view-tab {
     flex: 1; min-width: 0; background: none; border: none; color: #94a3b8;
-    padding: 10px 4px; border-radius: 13px; cursor: pointer;
+    padding: 10px 6px; border-radius: 999px; cursor: pointer;
     font-size: 0.72rem; font-weight: 800; letter-spacing: 0.3px;
-    text-transform: uppercase; min-height: 46px;
-    display: flex; align-items: center; justify-content: center; gap: 5px;
+    text-transform: uppercase; min-height: 46px; white-space: nowrap;
+    display: flex; align-items: center; justify-content: center;
     transition: background 0.2s, color 0.2s;
 }
-.view-tab { white-space: nowrap; }
 .view-tab:hover { color: var(--text); }
 .view-tab.active { background: var(--accent); color: #0b0f19; }
 
-.bottom-bar-divider {
-    width: 1px; align-self: stretch; margin: 6px 2px;
-    background: rgba(255, 255, 255, 0.12); flex: none;
-}
-
 @media (max-width: 430px) {
-    .bottom-bar { width: calc(100% - 20px); }
-    #addBtn { width: 42px; height: 42px; font-size: 1.35rem; }
+    .bottom-bar { width: calc(100% - 20px); gap: 8px; }
 }
 
 /* Bottom padding clears the fixed bottom bar so the last row stays reachable. */
@@ -518,28 +516,41 @@ h2 { font-size: 1.1rem; font-weight: 900; letter-spacing: 1px; color: var(--text
     max-height: 500px;
 }
 
-/* Plus button — lives at the right end of the bottom bar */
+/* Search button — its own circle beside the tab pill, not inside it. */
 #addBtn {
     flex: none;
-    width: 46px;
-    height: 46px;
-    /* Circular so the 45deg rotate-to-close stays round, not a diamond. */
+    width: 56px;
+    height: 56px;
     border-radius: 50%;
     background: var(--accent);
     color: #0b0f19;
     border: none;
-    font-size: 1.5rem;
-    font-weight: 300;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), background 0.2s;
-    line-height: 1;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+    transition: background 0.2s, transform 0.2s;
 }
-#addBtn.active {
-    transform: rotate(45deg);
-    background: #f87171;
+#addBtn:active { transform: scale(0.94); }
+#addBtn.active { background: #f87171; }
+
+#addBtn svg {
+    width: 22px; height: 22px;
+    fill: none; stroke: currentColor;
+    stroke-width: 2.2; stroke-linecap: round;
+}
+/* Swap the glyph rather than rotating it: a rotated magnifier reads as a
+   magnifier lying on its side, not as "close". */
+#addBtn .icon-close { display: none; }
+#addBtn.active .icon-search { display: none; }
+#addBtn.active .icon-close { display: block; }
+
+/* Must follow the base #addBtn rule above: same specificity, so an earlier
+   media query would simply be overridden. */
+@media (max-width: 430px) {
+    #addBtn { width: 50px; height: 50px; }
+    #addBtn svg { width: 20px; height: 20px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
