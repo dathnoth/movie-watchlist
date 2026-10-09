@@ -2,20 +2,18 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>MovieVault // Daniel</title>
     <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#38bdf8">
+    <meta name="theme-color" content="#000000">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
     <div id="authOverlay">
         <div class="auth-card">
-            <div class="header-area">
-                <h1>MOVIE<span>VAULT</span></h1>
-            </div>
-            <p style="font-size: 0.8rem; color: #64748b; margin-bottom: 24px;">Secure Entry Required</p>
+            <h1 class="wordmark">MOVIE<span>VAULT</span></h1>
+            <p class="auth-sub">Secure Entry Required</p>
             <div id="pinBoxes" class="pin-boxes">
                 <input class="pin-box" type="password" inputmode="numeric" maxlength="1" pattern="\d*" autocomplete="new-password" autofocus>
                 <input class="pin-box" type="password" inputmode="numeric" maxlength="1" pattern="\d*" autocomplete="new-password">
@@ -27,117 +25,125 @@
     </div>
 
     <div id="mainApp" style="display: none;">
-        <div class="projector-beam" aria-hidden="true"></div>
-        <div class="vignette" aria-hidden="true"></div>
-        <div class="header-area"><h1>MOVIE<span>VAULT</span></h1></div>
+        <!-- Blurred poster of whatever leads the current view, tinting the top of the screen. -->
+        <div id="backdrop" class="backdrop" aria-hidden="true"><img id="backdropImg" alt=""></div>
 
-        <div id="searchDrawer" class="search-drawer">
-            <div class="search-outer-wrapper">
-                <div class="search-container">
-                    <input type="text" id="movieInput" placeholder="Search movies" autocomplete="off">
-                    <button id="clearSearch">✕</button>
-                </div>
-                <div class="content-wrapper">
-                    <div id="searchResults"></div>
-                </div>
-            </div>
-        </div>
-
-        <div id="msg"></div>
-
-        <div class="lists-container">
+        <main class="lists-container">
             <section id="view-got" class="view-panel active">
-                <div class="content-wrapper">
-                    <div class="section-header">
-                        <h2 class="section-count"><span id="gotCount">0</span> Got</h2>
-                        <div class="sort-container" data-list="grid">
-                            <button class="sort-btn active" data-sort="title" onclick="setSort('title')">A-Z</button>
-                            <button class="sort-btn" data-sort="year" onclick="setSort('year')">Date</button>
-                            <button class="sort-btn" data-sort="rating" onclick="setSort('rating')">Stars</button>
-                            <button class="sort-btn" data-sort="runtime" onclick="setSort('runtime')">Runtime</button>
-                        </div>
+                <header class="view-head">
+                    <div>
+                        <p class="view-sub" id="gotSub"></p>
+                        <h1 class="view-title">Got</h1>
                     </div>
-                    <div id="gotList" class="movie-grid"></div>
+                    <button class="round-btn" onclick="rollPick()" aria-label="Pick another film">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="4"/><circle cx="8.5" cy="8.5" r="1.3"/><circle cx="15.5" cy="15.5" r="1.3"/><circle cx="12" cy="12" r="1.3"/></svg>
+                    </button>
+                </header>
+                <div class="chips sort-container" data-list="grid">
+                    <button class="chip sort-btn active" data-sort="title" onclick="setSort('title')">A–Z</button>
+                    <button class="chip sort-btn" data-sort="year" onclick="setSort('year')">Released</button>
+                    <button class="chip sort-btn" data-sort="rating" onclick="setSort('rating')">Rating</button>
+                    <button class="chip sort-btn" data-sort="runtime" onclick="setSort('runtime')">Runtime</button>
                 </div>
+                <button id="pickCard" class="pick-card" hidden></button>
+                <div id="gotList" class="poster-wall"></div>
             </section>
 
             <section id="view-get" class="view-panel">
-                <div class="content-wrapper">
-                    <div class="section-header">
-                        <h2 class="section-count"><span id="getCount">0</span> Get</h2>
+                <header class="view-head">
+                    <div>
+                        <p class="view-sub" id="getSub"></p>
+                        <h1 class="view-title">Get</h1>
                     </div>
-
-                    <div id="getList" class="movie-grid"></div>
-
-                    <section id="freshBlock" class="fresh-block">
-                        <div class="section-header">
-                            <h2 class="section-count fresh-heading"><span id="freshCount">0</span> Fresh Finds</h2>
-                        </div>
-                        <div class="fresh-filters">
-                            <select id="freshYear" class="fresh-filter" onchange="renderFresh()"></select>
-                            <select id="freshGenre" class="fresh-filter" onchange="renderFresh()"></select>
-                            <select id="freshRuntime" class="fresh-filter" onchange="renderFresh()">
-                                <option value="">Any length</option>
-                                <option value="0-90">Under 90 min</option>
-                                <option value="90-120">90–120 min</option>
-                                <option value="120-999">Over 120 min</option>
-                            </select>
-                            <select id="freshRating" class="fresh-filter" onchange="renderFresh()">
-                                <option value="">Any rating</option>
-                                <option value="6">6+</option>
-                                <option value="7">7+</option>
-                                <option value="8">8+</option>
-                            </select>
-                            <button id="freshReset" class="fresh-filter fresh-reset" onclick="resetFreshFilters()">Reset</button>
-                        </div>
-                        <div id="freshList" class="fresh-grid"></div>
-                        <p class="fresh-credit">Film data from TMDB</p>
-                    </section>
+                </header>
+                <div class="chips sort-container" data-list="grid">
+                    <button class="chip sort-btn active" data-sort="title" onclick="setSort('title')">A–Z</button>
+                    <button class="chip sort-btn" data-sort="year" onclick="setSort('year')">Released</button>
+                    <button class="chip sort-btn" data-sort="rating" onclick="setSort('rating')">Rating</button>
+                    <button class="chip sort-btn" data-sort="runtime" onclick="setSort('runtime')">Runtime</button>
                 </div>
+                <div id="getList" class="poster-wall"></div>
+
+                <section id="freshBlock" class="fresh-block">
+                    <h2 class="section-head">Fresh Finds <small id="freshCount">0</small></h2>
+                    <div class="chips fresh-filters">
+                        <select id="freshYear" class="chip chip-select" onchange="renderFresh()"></select>
+                        <select id="freshGenre" class="chip chip-select" onchange="renderFresh()"></select>
+                        <select id="freshRuntime" class="chip chip-select" onchange="renderFresh()">
+                            <option value="">Any length</option>
+                            <option value="0-90">Under 90 min</option>
+                            <option value="90-120">90–120 min</option>
+                            <option value="120-999">Over 120 min</option>
+                        </select>
+                        <select id="freshRating" class="chip chip-select" onchange="renderFresh()">
+                            <option value="">Any rating</option>
+                            <option value="6">6+</option>
+                            <option value="7">7+</option>
+                            <option value="8">8+</option>
+                        </select>
+                        <button id="freshReset" class="chip fresh-reset" onclick="resetFreshFilters()">Reset</button>
+                    </div>
+                    <div id="freshList" class="poster-wall"></div>
+                    <p class="fresh-credit">Film data from TMDB</p>
+                </section>
             </section>
 
             <section id="view-archive" class="view-panel">
-                <div class="content-wrapper">
-                    <div class="section-header">
-                        <h2 class="section-count"><span id="archiveCount">0</span> Watched</h2>
-                        <div class="sort-container" data-list="watched">
-                            <button class="sort-btn active" data-sort="watched" onclick="setSort('watched', 'watched')">Recent</button>
-                            <button class="sort-btn" data-sort="title" onclick="setSort('title', 'watched')">A-Z</button>
-                            <button class="sort-btn" data-sort="year" onclick="setSort('year', 'watched')">Date</button>
-                            <button class="sort-btn" data-sort="rating" onclick="setSort('rating', 'watched')">Stars</button>
-                            <button class="sort-btn" data-sort="runtime" onclick="setSort('runtime', 'watched')">Runtime</button>
-                        </div>
+                <header class="view-head">
+                    <div>
+                        <p class="view-sub" id="archiveSub"></p>
+                        <h1 class="view-title">Watched</h1>
                     </div>
-                    <div id="archiveList" class="archive-list"></div>
+                </header>
+                <div id="recentBlock">
+                    <h2 class="section-head">Recently</h2>
+                    <div id="recentShelf" class="shelf"></div>
                 </div>
+                <div class="chips sort-container" data-list="watched">
+                    <button class="chip sort-btn active" data-sort="watched" onclick="setSort('watched', 'watched')">Recent</button>
+                    <button class="chip sort-btn" data-sort="title" onclick="setSort('title', 'watched')">A–Z</button>
+                    <button class="chip sort-btn" data-sort="year" onclick="setSort('year', 'watched')">Released</button>
+                    <button class="chip sort-btn" data-sort="rating" onclick="setSort('rating', 'watched')">Rating</button>
+                    <button class="chip sort-btn" data-sort="runtime" onclick="setSort('runtime', 'watched')">Runtime</button>
+                </div>
+                <div id="archiveList" class="watched-list"></div>
             </section>
+        </main>
+
+        <div id="searchSheet" class="search-sheet" aria-hidden="true">
+            <div class="search-bar">
+                <svg class="search-glyph" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5L21 21"/></svg>
+                <input type="search" id="movieInput" placeholder="Search films and TV" autocomplete="off" enterkeyhint="search">
+                <button id="clearSearch" aria-label="Clear search">✕</button>
+            </div>
+            <p id="searchHint" class="search-hint">Type at least 3 letters</p>
+            <div id="searchResults" class="search-wall"></div>
         </div>
 
-        <nav class="bottom-bar" aria-label="Library views">
-            <div class="bottom-bar-inner">
-                <button class="view-tab active" data-view="got" onclick="setView('got')">Got</button>
-                <button class="view-tab" data-view="get" onclick="setView('get')">Get</button>
-                <button class="view-tab" data-view="archive" onclick="setView('archive')">Watched</button>
+        <nav class="dock" aria-label="Library views">
+            <div class="tabs">
+                <button class="view-tab active" data-view="got" onclick="setView('got')">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M3 9h18M3 15h18M7.5 5v14M16.5 5v14"/></svg>Got
+                </button>
+                <button class="view-tab" data-view="get" onclick="setView('get')">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3.5h12v17l-6-4-6 4z"/></svg>Get
+                </button>
+                <button class="view-tab" data-view="archive" onclick="setView('archive')">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>Watched
+                </button>
             </div>
             <button id="addBtn" onclick="toggleSearch()" aria-label="Search for a movie">
-                <svg class="icon-search" viewBox="0 0 24 24" aria-hidden="true">
-                    <circle cx="11" cy="11" r="7"></circle>
-                    <line x1="16.5" y1="16.5" x2="21" y2="21"></line>
-                </svg>
-                <svg class="icon-close" viewBox="0 0 24 24" aria-hidden="true">
-                    <line x1="6" y1="6" x2="18" y2="18"></line>
-                    <line x1="18" y1="6" x2="6" y2="18"></line>
-                </svg>
+                <svg class="icon-search" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5L21 21"/></svg>
+                <svg class="icon-close" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
             </button>
         </nav>
 
         <div id="detailsModal" onclick="closeModal()">
             <div class="modal-content" onclick="event.stopPropagation()">
-                <button class="modal-close" onclick="closeModal()">✕</button>
+                <button class="modal-close" onclick="closeModal()" aria-label="Close">✕</button>
                 <div id="modalData"></div>
             </div>
         </div>
-
     </div>
 
     <script src="app.js"></script>

@@ -44,7 +44,7 @@ Three states, all driven from the movie detail modal:
 - **GOT** — on the hard drive, browsable, ready to watch (the default view)
 - **WATCHED** — already watched. Stored as `'archive'` in the database; only the UI says Watched
 
-Tapping a search result or Fresh Find opens the detail modal, which offers Got / Get / Watched for anything not yet in the library (Watched covers films seen at the cinema). Moving a movie to Watched — or adding it there — swaps the modal for a prompt offering the IMDb page.
+Every poster opens the detail screen, whose bottom panel is a single Got / Get / Watched control: for a film not yet in the library it adds it (Watched covers films seen at the cinema), for a saved one it moves it, with the current status shown selected. Moving a movie to Watched — or adding it there — swaps that panel for a prompt offering the IMDb page. Removing a film is also done from the detail screen.
 
 ## Auth
 
@@ -74,11 +74,13 @@ All SQL uses prepared statements with bound parameters.
 
 ## Key Features
 
-- **Tabbed views** — GOT (default) / GET / WATCHED, counts in the tab bar
-- **Sorting** — title / release date / rating / runtime, shared by the poster grids; WATCHED has its own sort, defaulting to most recently watched
-- **Watched** — compact list rows: thumbnail, title, year·runtime, watched date, rating
-- **Movie roulette** — random pick from GOT only; hidden on other tabs
-- **Search** — TMDB via the Function proxy, debounced 300ms; results already in the library are badged with their status
+- **Design** — "Poster Wall": mobile-first, true black, one colour per list (Got blue, Get violet, Watched green). A floating dock holds the tabs and a separate search button
+- **Tabbed views** — GOT (default) / GET / WATCHED, each with a large title and count
+- **Poster wall** — GOT and GET are edge-to-edge poster grids (3 across on a phone) with the rating on each poster
+- **Sorting** — title / release date / rating / runtime chips, shared by the poster walls; WATCHED has its own sort, defaulting to most recently watched (grouped by month)
+- **Watched** — a "Recently" shelf of the latest posters, then list rows: thumbnail, title, watched date, year, rating
+- **Tonight's pick** — random film from GOT at the top of that tab; the dice button rerolls it
+- **Search** — full-screen sheet; TMDB via the Function proxy, debounced 300ms; results already in the library are badged with their status
 
 ## Local development
 

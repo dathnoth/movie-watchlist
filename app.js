@@ -4,9 +4,25 @@ let watchedSort = 'watched';
 let currentView = 'got';
 let cachedMovies = [];
 let freshFilms = [];
+let searchHits = [];
+let pickId = null;
+// OMDB detail fetched for the open modal, reused when adding so it isn't fetched twice.
+const detailCache = {};
 
 // 'archive' is the stored status value; the UI calls it Watched.
 const STATUS_LABELS = { get: 'Get', got: 'Got', archive: 'Watched' };
+
+// Inline so the star renders identically everywhere, unlike the emoji it replaces.
+const STAR_SVG = '<svg class="star-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.6l2.9 5.9 6.5.95-4.7 4.58 1.11 6.47L12 17.44l-5.81 3.06 1.11-6.47-4.7-4.58 6.5-.95z"/></svg>';
+
+const ICONS = {
+    got: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M3 9h18M3 15h18M7.5 5v14M16.5 5v14"/></svg>',
+    get: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3.5h12v17l-6-4-6 4z"/></svg>',
+    archive: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
+    play: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l13-7.5z"/></svg>',
+    ext: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>',
+    check: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+};
 
 function getPin() { return localStorage.getItem('vault_pin') || ''; }
 
@@ -36,73 +52,123 @@ window.onload = () => {
     }
 };
 
+// OMDB reports missing fields as the string "N/A".
+const known = (v) => (v && v !== 'N/A' ? v : '');
+// OMDB sometimes sends text with HTML entities already in it ("O&apos;Connell").
+const omdbText = (v) => known(v).replace(/&apos;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&');
+const yearOf = (m) => (m.year || '').match(/\d{4}/)?.[0] || '';
+const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+
+// Poster tile contents. The title sits underneath the image, so a missing or
+// dead poster still shows what the film is.
+function tileInner({ title, poster, rating, tv, badge }) {
+    const img = known(poster)
+        ? `<img src="${escapeHtml(poster)}" alt="" loading="lazy" onload="this.classList.add('loaded')" onerror="this.remove()">`
+        : '';
+    return `<span class="tile-fallback">${escapeHtml(title)}</span>${img}
+        ${tv ? '<span class="tile-tv">TV</span>' : ''}
+        ${badge || ''}
+        ${known(rating) ? `<span class="tile-rating">${STAR_SVG}${escapeHtml(rating)}</span>` : ''}`;
+}
+
+function libraryTile(m) {
+    return `<button class="tile" onclick="showDetails('${m.imdb_id}')" aria-label="${escapeHtml(m.title)}">
+        ${tileInner({ title: m.title, poster: m.poster, rating: m.rating, tv: m.is_tv_show })}</button>`;
+}
+
+const SKELETON_TILES = Array(9).fill('<span class="tile skeleton-shimmer"></span>').join('');
+
+// ── Search ────────────────────────────────────────────────────────────────
+
 document.getElementById('movieInput').addEventListener('input', (e) => {
-    const clearBtn = document.getElementById('clearSearch');
-    const resultsDiv = document.getElementById('searchResults');
-    clearBtn.style.display = e.target.value.length > 0 ? 'block' : 'none';
-    clearTimeout(debounceTimer);
     const q = e.target.value;
-    if (q.length < 3) { resultsDiv.classList.remove('active'); resultsDiv.innerHTML = ''; return; }
-    resultsDiv.classList.add('active');
-    resultsDiv.innerHTML = Array(6).fill('<div class="movie-card skeleton-shimmer" style="min-width:160px; height:240px;"></div>').join('');
+    document.getElementById('clearSearch').style.display = q ? 'flex' : 'none';
+    clearTimeout(debounceTimer);
+    const resultsDiv = document.getElementById('searchResults');
+    if (q.length < 3) {
+        searchHits = [];
+        resultsDiv.innerHTML = '';
+        setSearchHint('Type at least 3 letters');
+        return;
+    }
+    setSearchHint('');
+    resultsDiv.innerHTML = SKELETON_TILES;
     debounceTimer = setTimeout(() => liveSearch(q), 300);
 });
+
+document.getElementById('clearSearch').addEventListener('click', () => {
+    const input = document.getElementById('movieInput');
+    input.value = '';
+    input.dispatchEvent(new Event('input'));
+    input.focus();
+});
+
+function setSearchHint(text) {
+    const hint = document.getElementById('searchHint');
+    hint.textContent = text;
+    hint.hidden = !text;
+}
 
 async function liveSearch(query) {
     const res = await fetch(`/api?type=search&q=${encodeURIComponent(query)}`);
     const data = await res.json();
+    // A slower, older query must not overwrite the results of a newer one.
+    if (query !== document.getElementById('movieInput').value) return;
+    searchHits = (data.Search || []).slice(0, 12);
+    renderSearch();
+}
+
+function renderSearch() {
     const resultsDiv = document.getElementById('searchResults');
-    resultsDiv.innerHTML = '';
-    if (!data.Search) return;
-    data.Search.slice(0, 10).forEach(m => {
-        const div = document.createElement('div');
-        div.className = 'movie-card';
-        div.id = `search-${m.imdbID}`;
-        div.style.minWidth = '140px';
-        // OMDB reports a missing poster as the string "N/A", not an empty field.
-        const poster = m.Poster && m.Poster !== 'N/A'
-            ? `<img src="${escapeHtml(m.Poster)}" class="search-poster">`
-            : '<div class="search-poster search-poster-empty">No poster</div>';
-        const year = m.Year && m.Year !== 'N/A'
-            ? `<div class="search-year">${escapeHtml(m.Year)}</div>`
-            : '';
-        // Matches how the library flags TV: series only, movies get no marker.
-        const tv = m.Type === 'series' ? ' <span class="tv-badge-inline">TV</span>' : '';
+    if (searchHits.length === 0) {
+        resultsDiv.innerHTML = '';
+        if (document.getElementById('movieInput').value.length >= 3) setSearchHint('No matches');
+        return;
+    }
+    resultsDiv.innerHTML = searchHits.map((m) => {
         // Flag anything already saved, so you can see at a glance that a
         // result is on the drive, wanted, or already watched.
         const existing = cachedMovies.find((x) => x.imdb_id === m.imdbID);
-        const owned = existing
-            ? `<div class="search-owned status-${existing.status}">${STATUS_LABELS[existing.status]}</div>`
+        const badge = existing
+            ? `<span class="tile-owned status-${existing.status}">${STATUS_LABELS[existing.status]}</span>`
             : '';
-        if (existing) div.classList.add('is-owned');
-        div.innerHTML = `${poster}${owned}
-            <div class="search-meta">
-                <div class="search-title">${escapeHtml(m.Title)}${tv}</div>
-                ${year}
-            </div>`;
-        // Some OMDB poster URLs are present but dead; swap in the same
-        // placeholder rather than leaving a broken-image icon.
-        div.querySelector('img.search-poster')?.addEventListener('error', function () {
-            const fallback = document.createElement('div');
-            fallback.className = 'search-poster search-poster-empty';
-            fallback.textContent = 'No poster';
-            this.replaceWith(fallback);
-        });
-        // Open the detail modal so you choose where it goes (Got, Get or
-        // Watched) rather than it landing in whichever tab is open.
-        div.onclick = () => showDetails(m.imdbID);
-        resultsDiv.appendChild(div);
-    });
+        // Matches how the library flags TV: series only, movies get no marker.
+        const tv = m.Type === 'series';
+        return `<button class="search-item${existing ? ' is-owned' : ''}" onclick="showDetails('${escapeHtml(m.imdbID)}')">
+            <span class="tile">${tileInner({ title: m.Title, poster: m.Poster, tv, badge })}</span>
+            <span class="search-title">${escapeHtml(m.Title)}</span>
+            <span class="search-year">${escapeHtml(known(m.Year))}</span>
+        </button>`;
+    }).join('');
 }
+
+function toggleSearch() {
+    const sheet = document.getElementById('searchSheet');
+    const isOpen = sheet.classList.toggle('open');
+    sheet.setAttribute('aria-hidden', String(!isOpen));
+    document.getElementById('addBtn').classList.toggle('active', isOpen);
+    document.body.classList.toggle('search-open', isOpen);
+    const input = document.getElementById('movieInput');
+    if (isOpen) {
+        // Focus inside the tap handler itself, or iOS won't raise the keyboard.
+        input.focus();
+    } else {
+        input.value = '';
+        input.blur();
+        searchHits = [];
+        document.getElementById('searchResults').innerHTML = '';
+        document.getElementById('clearSearch').style.display = 'none';
+        setSearchHint('Type at least 3 letters');
+    }
+}
+
+// ── Fresh Finds ───────────────────────────────────────────────────────────
 
 // Fresh finds: recent, digitally-released films not already in the library.
 // Failures stay silent — this is a discovery extra, not core to the app.
 async function fetchFresh() {
     const block = document.getElementById('freshBlock');
-    const grid = document.getElementById('freshList');
-    grid.innerHTML = Array(6).fill(
-        '<div class="fresh-card skeleton-shimmer" style="height:250px;"></div>'
-    ).join('');
+    document.getElementById('freshList').innerHTML = SKELETON_TILES;
 
     let films;
     try {
@@ -162,41 +228,13 @@ function renderFresh() {
     });
 
     document.getElementById('freshCount').textContent = visible.length;
-    document.getElementById('freshReset').classList.toggle(
-        'active', Boolean(year || genre || runtime || minRating)
-    );
+    document.querySelectorAll('.fresh-filters .chip-select').forEach((sel) => sel.classList.toggle('active', Boolean(sel.value)));
+    document.getElementById('freshReset').hidden = !(year || genre || runtime || minRating);
 
-    if (visible.length === 0) {
-        grid.innerHTML = '<p class="empty-state">Nothing matches those filters.</p>';
-        return;
-    }
-
-    grid.innerHTML = '';
-    visible.forEach((f) => {
-        const div = document.createElement('div');
-        div.className = 'fresh-card';
-        div.id = `fresh-${f.imdb_id}`;
-        const poster = f.poster
-            ? `<img src="${escapeHtml(f.poster)}" class="fresh-poster" loading="lazy">`
-            : '<div class="fresh-poster fresh-poster-empty">No poster</div>';
-        const rating = f.rating
-            ? `<span class="card-rating">${STAR_SVG}${escapeHtml(f.rating)}</span>`
-            : '';
-        const meta = [f.year, f.runtime ? `${f.runtime} min` : null].filter(Boolean).join(' • ');
-        div.innerHTML = `${poster}
-            <div class="fresh-meta">
-                <div class="fresh-title">${escapeHtml(f.title)}</div>
-                <div class="fresh-sub"><span>${escapeHtml(meta)}</span>${rating}</div>
-            </div>`;
-        div.querySelector('img.fresh-poster')?.addEventListener('error', function () {
-            const fallback = document.createElement('div');
-            fallback.className = 'fresh-poster fresh-poster-empty';
-            fallback.textContent = 'No poster';
-            this.replaceWith(fallback);
-        });
-        div.onclick = () => showDetails(f.imdb_id);
-        grid.appendChild(div);
-    });
+    grid.innerHTML = visible.map((f) => `
+        <button class="tile" onclick="showDetails('${escapeHtml(f.imdb_id)}')" aria-label="${escapeHtml(f.title)}">
+            ${tileInner({ title: f.title, poster: f.poster, rating: f.rating })}</button>`).join('')
+        || '<p class="empty-state">Nothing matches those filters.</p>';
 }
 
 function resetFreshFilters() {
@@ -205,11 +243,15 @@ function resetFreshFilters() {
     renderFresh();
 }
 
+// ── Library ───────────────────────────────────────────────────────────────
+
 async function fetchMovies() {
     const data = await api('list');
     if (!Array.isArray(data)) return;
     cachedMovies = data;
     render(data);
+    // Owned badges on open search results follow the library.
+    if (searchHits.length) renderSearch();
     // Re-run after each library change so anything just added drops out.
     fetchFresh();
 }
@@ -230,10 +272,12 @@ function setView(view) {
     currentView = view;
     document.querySelectorAll('.view-tab').forEach(t => t.classList.toggle('active', t.dataset.view === view));
     document.querySelectorAll('.view-panel').forEach(p => p.classList.toggle('active', p.id === `view-${view}`));
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (document.body.classList.contains('search-open')) toggleSearch();
+    updateBackdrop();
+    window.scrollTo({ top: 0 });
 }
 
-// The poster grids share one sort; the Watched list keeps its own so it can
+// The poster walls share one sort; the Watched list keeps its own so it can
 // default to most recently watched.
 function setSort(type, list = 'grid') {
     if (list === 'watched') watchedSort = type;
@@ -243,48 +287,41 @@ function setSort(type, list = 'grid') {
     render(cachedMovies);
 }
 
-function formatWatchedDate(value) {
-    return new Date(value + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+function formatWatchedDate(value, opts) {
+    return new Date(value + 'T00:00:00').toLocaleDateString('en-GB', opts);
 }
 
-function cardHtml(m) {
+function watchedRowHtml(m) {
+    const meta = [
+        m.watched_at ? `<em>${formatWatchedDate(m.watched_at, { weekday: 'short', day: 'numeric', month: 'short' })}</em>` : '',
+        escapeHtml(yearOf(m)),
+        known(m.rating) ? `★ ${escapeHtml(m.rating)}` : '',
+    ].filter(Boolean).join(' · ');
     return `
-        <div class="movie-card">
-            <button class="remove-btn" onclick="deleteMovie('${m.imdb_id}')">✕</button>
-            ${m.is_tv_show ? '<span class="tv-badge">TV</span>' : ''}
-            <div class="poster-wrapper skeleton-shimmer" onclick="showDetails('${m.imdb_id}')">
-                <img class="card-poster" src="${escapeHtml(m.poster)}" onload="this.classList.add('loaded')">
-            </div>
-            <div class="card-content" onclick="showDetails('${m.imdb_id}')">
-                <div class="movie-title">${escapeHtml(m.title)}</div>
-                <span class="genre-tag">${escapeHtml(m.genre)}</span>
-                <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <span class="runtime-text">${escapeHtml(m.runtime)}</span>
-                    <span class="card-rating">${STAR_SVG}${escapeHtml(m.rating)}</span>
-                </div>
-            </div>
-        </div>`;
+        <button class="watched-row" onclick="showDetails('${m.imdb_id}')">
+            <span class="watched-thumb">${known(m.poster) ? `<img src="${escapeHtml(m.poster)}" alt="" loading="lazy" onerror="this.remove()">` : ''}</span>
+            <span class="watched-main">
+                <span class="watched-title">${escapeHtml(m.title)}${m.is_tv_show ? ' <span class="tv-badge-inline">TV</span>' : ''}</span>
+                <span class="watched-meta">${meta}</span>
+            </span>
+        </button>`;
 }
 
-// Inline so the star renders identically everywhere, unlike the emoji it replaces.
-const STAR_SVG = '<svg class="star-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.6l2.9 5.9 6.5.95-4.7 4.58 1.11 6.47L12 17.44l-5.81 3.06 1.11-6.47-4.7-4.58 6.5-.95z"/></svg>';
+// Sorted by Recent, the list is grouped by the month it was watched in.
+function watchedListHtml(list) {
+    if (list.length === 0) return '<p class="empty-state">Nothing watched yet.</p>';
+    if (watchedSort !== 'watched') return list.map(watchedRowHtml).join('');
 
-function archiveRowHtml(m) {
-    const year = (m.year || '').match(/\d{4}/)?.[0] || '';
-    const meta = [year, m.runtime && m.runtime !== 'N/A' ? m.runtime : null].filter(Boolean).join(' • ');
-    return `
-        <div class="archive-row" onclick="showDetails('${m.imdb_id}')">
-            <img class="archive-thumb" src="${escapeHtml(m.poster)}" loading="lazy">
-            <div class="archive-main">
-                <div class="archive-title">${escapeHtml(m.title)}${m.is_tv_show ? ' <span class="tv-badge-inline">TV</span>' : ''}</div>
-                <div class="archive-meta">
-                    <span>${escapeHtml(meta)}</span>
-                    ${m.watched_at ? `<span class="archive-date">Watched ${formatWatchedDate(m.watched_at)}</span>` : ''}
-                </div>
-            </div>
-            <span class="archive-rating">${STAR_SVG}${escapeHtml(m.rating)}</span>
-            <button class="archive-remove" onclick="event.stopPropagation(); deleteMovie('${m.imdb_id}')">✕</button>
-        </div>`;
+    const groups = [];
+    list.forEach((m) => {
+        const key = m.watched_at ? formatWatchedDate(m.watched_at, { month: 'long', year: 'numeric' }) : 'Earlier';
+        let g = groups[groups.length - 1];
+        if (!g || g.key !== key) groups.push(g = { key, items: [] });
+        g.items.push(m);
+    });
+    return groups.map((g) => `
+        <h3 class="month-head">${escapeHtml(g.key)}<small>${g.items.length}</small></h3>
+        ${g.items.map(watchedRowHtml).join('')}`).join('');
 }
 
 function render(movies) {
@@ -294,25 +331,83 @@ function render(movies) {
     buckets.got = sortMovies(buckets.got, currentSort);
     buckets.archive = sortMovies(buckets.archive, watchedSort);
 
-    document.getElementById('getList').innerHTML = buckets.get.map(cardHtml).join('')
-        || '<p class="empty-state">Nothing to track down yet.</p>';
-    document.getElementById('gotList').innerHTML = buckets.got.map(cardHtml).join('')
+    document.getElementById('gotList').innerHTML = buckets.got.map(libraryTile).join('')
         || '<p class="empty-state">No movies on the drive yet.</p>';
-    document.getElementById('archiveList').innerHTML = buckets.archive.map(archiveRowHtml).join('')
-        || '<p class="empty-state">Nothing watched yet.</p>';
+    document.getElementById('getList').innerHTML = buckets.get.map(libraryTile).join('')
+        || '<p class="empty-state">Nothing to track down yet.</p>';
+    document.getElementById('archiveList').innerHTML = watchedListHtml(buckets.archive);
+    // Sorting one film (or none) is pointless, so the chips only show for two or more.
+    document.querySelector('#view-got .sort-container').hidden = buckets.got.length < 2;
+    document.querySelector('#view-get .sort-container').hidden = buckets.get.length < 2;
+    document.querySelector('#view-archive .sort-container').hidden = buckets.archive.length < 2;
 
-    document.getElementById('getCount').textContent = buckets.get.length;
-    document.getElementById('gotCount').textContent = buckets.got.length;
-    document.getElementById('archiveCount').textContent = buckets.archive.length;
+    // The shelf always shows the latest few, whatever the list below is sorted by.
+    const recent = sortMovies(buckets.archive.filter((m) => m.watched_at), 'watched').slice(0, 10);
+    document.getElementById('recentBlock').hidden = recent.length === 0;
+    document.getElementById('recentShelf').innerHTML = recent.map((m) => `
+        <button class="shelf-item" onclick="showDetails('${m.imdb_id}')">
+            <span class="shelf-poster">${known(m.poster) ? `<img src="${escapeHtml(m.poster)}" alt="" loading="lazy" onerror="this.remove()">` : ''}</span>
+            <span class="shelf-title">${escapeHtml(m.title)}</span>
+            <span class="shelf-date">${formatWatchedDate(m.watched_at, { day: 'numeric', month: 'short' })}</span>
+        </button>`).join('');
+
+    document.getElementById('gotSub').textContent = `${plural(buckets.got.length, 'film')} on the drive`;
+    document.getElementById('getSub').textContent = `${plural(buckets.get.length, 'film')} to track down`;
+    document.getElementById('archiveSub').textContent = `${plural(buckets.archive.length, 'film')} seen`;
+
+    renderPick(buckets.got);
+    updateBackdrop();
 }
 
+// ── Tonight's pick ────────────────────────────────────────────────────────
+
+// A random film from Got, kept until it leaves Got or you roll again.
+function renderPick(got) {
+    const card = document.getElementById('pickCard');
+    if (got.length === 0) { card.hidden = true; pickId = null; return; }
+    if (!got.some((m) => m.imdb_id === pickId)) pickId = got[Math.floor(Math.random() * got.length)].imdb_id;
+
+    const m = got.find((x) => x.imdb_id === pickId);
+    const meta = [yearOf(m), known(m.runtime), known(m.rating) ? `★ ${m.rating}` : ''].filter(Boolean).join(' · ');
+    card.hidden = false;
+    card.innerHTML = `
+        ${known(m.poster) ? `<img class="pick-blur" src="${escapeHtml(m.poster)}" alt=""><img class="pick-cover" src="${escapeHtml(m.poster)}" alt="">` : ''}
+        <span class="pick-text">
+            <small>Tonight's pick</small>
+            <b>${escapeHtml(m.title)}</b>
+            <span>${escapeHtml(meta)}</span>
+            <span class="pick-open">See details</span>
+        </span>`;
+    card.onclick = () => showDetails(m.imdb_id);
+}
+
+function rollPick() {
+    const got = cachedMovies.filter((m) => m.status === 'got');
+    if (got.length < 2) return;
+    const others = got.filter((m) => m.imdb_id !== pickId);
+    pickId = others[Math.floor(Math.random() * others.length)].imdb_id;
+    renderPick(got);
+    updateBackdrop();
+}
+
+// Tint the top of the screen with the poster leading the current view.
+function updateBackdrop() {
+    let lead;
+    if (currentView === 'got') lead = cachedMovies.find((m) => m.imdb_id === pickId);
+    else if (currentView === 'get') lead = sortMovies(cachedMovies.filter((m) => m.status === 'get'), currentSort)[0] || freshFilms[0];
+    else lead = sortMovies(cachedMovies.filter((m) => m.status === 'archive'), 'watched')[0];
+
+    const backdrop = document.getElementById('backdrop');
+    const img = document.getElementById('backdropImg');
+    const src = known(lead?.poster);
+    backdrop.classList.toggle('on', Boolean(src));
+    if (src && img.getAttribute('src') !== src) img.src = src;
+}
+
+// ── Detail modal ──────────────────────────────────────────────────────────
+
 async function addToVault(id, status) {
-    const card = document.getElementById(`search-${id}`) || document.getElementById(`fresh-${id}`);
-    if (card) card.classList.add('added-state');
-
-    const res = await fetch(`/api?type=detail&id=${id}`);
-    const d = await res.json();
-
+    const d = detailCache[id] || await (await fetch(`/api?type=detail&id=${id}`)).json();
     await api('upsert', {
         body: {
             imdb_id: d.imdbID,
@@ -326,61 +421,61 @@ async function addToVault(id, status) {
             is_tv_show: d.Type === 'series',
         },
     });
-
-    setTimeout(() => {
-        document.getElementById('searchResults').classList.remove('active');
-        fetchMovies();
-    }, 600);
 }
 
-function statusActions(id, status) {
-    const btn = (target, label, cls) =>
-        `<button onclick="updateStatus('${id}', '${target}')" class="modal-btn ${cls}">${label}</button>`;
-
-    if (status === 'get') return btn('got', 'Got It', 'btn-got');
-    if (status === 'got') return btn('archive', 'Watched', 'btn-watched') + btn('get', 'Not On Drive', 'btn-restore');
-    if (status === 'archive') return btn('got', 'Restore', 'btn-restore');
-    return '';
-}
-
-// Not in the library yet, so adding has to insert the row. updateStatus runs
-// an UPDATE, which would match nothing and fail silently.
-function addActions(id) {
-    const btn = (target, label, cls) =>
-        `<button onclick="addFromModal('${id}', '${target}')" data-status="${target}" class="modal-btn ${cls}">${label}</button>`;
+// One control for both cases: for a film not yet saved it adds it, for a
+// saved one it moves it. The current status is shown selected.
+function pickerHtml(id, status) {
+    const btn = (target, label) => `
+        <button class="seg-btn seg-${target}${target === status ? ' on' : ''}" data-status="${target}"
+            onclick="pickStatus('${id}', '${target}')"${target === status ? ' aria-pressed="true"' : ''}>${ICONS[target]}${label}</button>`;
     return `
-        <div class="modal-info-label add-label">Add to</div>
-        <div class="btn-group add-group" id="addGroup-${id}">
-            ${btn('got', 'Got', 'btn-got')}${btn('get', 'Get', 'btn-get')}${btn('archive', 'Watched', 'btn-watched')}
-        </div>`;
+        <small class="picker-label">${status ? 'In your library' : 'Add to your library'}</small>
+        <div class="seg">${btn('got', 'Got')}${btn('get', 'Get')}${btn('archive', 'Watched')}</div>`;
 }
 
-async function addFromModal(id, status) {
-    const group = document.getElementById(`addGroup-${id}`);
-    group?.querySelectorAll('button').forEach(b => {
+async function pickStatus(id, status) {
+    const local = cachedMovies.find((m) => m.imdb_id === id);
+    if (local?.status === status) return;
+
+    const picker = document.getElementById('picker');
+    picker.querySelectorAll('.seg-btn').forEach((b) => {
         b.disabled = true;
-        if (b.dataset.status === status) b.textContent = 'Adding…';
+        b.classList.toggle('busy', b.dataset.status === status);
     });
-    await addToVault(id, status);
-    if (status === 'archive') { askImdb(id); return; }
-    setTimeout(closeModal, 500);
+
+    // An existing row only needs its status changed (which also manages
+    // watched_at); a new one has to be inserted, as the status UPDATE would
+    // match nothing and fail silently.
+    if (local) await api('status', { body: { imdb_id: id, status } });
+    else await addToVault(id, status);
+    await fetchMovies();
+
+    if (status === 'archive') askImdb(id);
+    else closeModal();
 }
 
 // After marking something watched, offer the IMDb page for trivia and reviews.
 // The link is a real tap target, so it opens even in the installed PWA.
 function askImdb(id) {
-    const title = cachedMovies.find(m => m.imdb_id === id)?.title
-        || document.querySelector('#modalData h2')?.textContent || 'this one';
-    document.getElementById('modalData').innerHTML = `
+    document.getElementById('picker').innerHTML = `
         <div class="imdb-prompt">
-            <div class="imdb-prompt-check">✓</div>
-            <h2>Marked as watched</h2>
-            <p>Read the trivia and reviews for <strong>${escapeHtml(title)}</strong> on IMDb?</p>
-            <div class="btn-group">
-                <a href="https://www.imdb.com/title/${id}/" target="_blank" rel="noopener" onclick="closeModal()" class="modal-btn btn-imdb btn-imdb-primary">Open IMDb</a>
-                <button onclick="closeModal()" class="modal-btn">Not Now</button>
+            <div class="imdb-prompt-head">
+                <span class="imdb-check">${ICONS.check}</span>
+                <span><b>Marked as watched</b><span>Read the trivia and reviews on IMDb?</span></span>
+            </div>
+            <div class="imdb-prompt-actions">
+                <a href="https://www.imdb.com/title/${id}/" target="_blank" rel="noopener" onclick="closeModal()" class="btn-imdb">Open IMDb</a>
+                <button onclick="closeModal()" class="btn-quiet">Not now</button>
             </div>
         </div>`;
+}
+
+async function removeFromModal(id) {
+    if (!confirm('Remove from your library?')) return;
+    await api('delete', { body: { imdb_id: id } });
+    closeModal();
+    fetchMovies();
 }
 
 async function showDetails(id) {
@@ -390,80 +485,69 @@ async function showDetails(id) {
     document.body.classList.add('modal-open');
 
     content.innerHTML = `
-        <div class="modal-body">
-            <div class="skeleton-shimmer" style="width:200px; height:300px; border-radius:16px; flex-shrink:0;"></div>
-            <div style="flex:1; width:100%;">
-                <div class="skeleton-shimmer" style="width:80%; height:32px; margin-bottom:12px; border-radius:4px;"></div>
-                <div class="skeleton-shimmer" style="width:50%; height:18px; margin-bottom:25px; border-radius:4px;"></div>
-                <div class="skeleton-shimmer" style="width:100%; height:14px; margin-bottom:8px;"></div>
-                <div class="skeleton-shimmer" style="width:100%; height:14px; margin-bottom:25px;"></div>
-                <div style="display:flex; gap:10px;">
-                    <div class="skeleton-shimmer" style="flex:1; height:45px; border-radius:12px;"></div>
-                    <div class="skeleton-shimmer" style="flex:1; height:45px; border-radius:12px;"></div>
-                </div>
+        <div class="detail">
+            <div class="detail-hero skeleton-shimmer"></div>
+            <div class="detail-body">
+                <div class="skeleton-shimmer" style="width:75%; height:30px; border-radius:6px; margin-bottom:12px;"></div>
+                <div class="skeleton-shimmer" style="width:55%; height:16px; border-radius:4px; margin-bottom:18px;"></div>
+                <div class="skeleton-shimmer" style="width:100%; height:13px; border-radius:4px; margin-bottom:8px;"></div>
+                <div class="skeleton-shimmer" style="width:90%; height:13px; border-radius:4px;"></div>
             </div>
         </div>`;
 
-    const local = cachedMovies.find(m => m.imdb_id === id);
     let d;
     try {
         d = await (await fetch(`/api?type=detail&id=${id}`)).json();
     } catch {
-        content.innerHTML = '<p style="color:#f87171; padding:20px;">Failed to load movie details. Please try again.</p>';
+        content.innerHTML = '<p class="detail-error">Failed to load movie details. Please try again.</p>';
         return;
     }
     if (!d || !d.Title) {
-        content.innerHTML = '<p style="color:#f87171; padding:20px;">Movie details not available.</p>';
+        content.innerHTML = '<p class="detail-error">Movie details not available.</p>';
         return;
     }
+    detailCache[id] = d;
 
+    const local = cachedMovies.find(m => m.imdb_id === id);
     const ytUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(d.Title + ' trailer')}`;
+    const meta = [known(d.Released) || known(d.Year), known(d.Runtime), known(d.Genre).split(',')[0]]
+        .filter(Boolean).map(escapeHtml).join(' · ');
+    const credit = (label, value) => omdbText(value)
+        ? `<div><dt>${label}</dt><dd>${escapeHtml(omdbText(value))}</dd></div>` : '';
 
     content.innerHTML = `
-        <div class="modal-body">
-            <img src="${escapeHtml(d.Poster)}" class="modal-poster">
-            <div style="flex:1; width: 100%;">
-                <h2 style="font-size:1.7rem; color:white; margin:0 0 5px 0;">${escapeHtml(d.Title)}</h2>
-                <div style="color:var(--accent); font-weight:bold; margin-bottom:15px; font-size:0.85rem;">
-                    ${escapeHtml(d.Released)} • ${escapeHtml(d.Runtime)} • <span class="modal-rating">${STAR_SVG}${escapeHtml(d.imdbRating)}</span>
+        <div class="detail">
+            <div class="detail-hero">${known(d.Poster) ? `<img src="${escapeHtml(d.Poster)}" alt="">` : ''}</div>
+            <div class="detail-body">
+                <h2 class="detail-title">${escapeHtml(omdbText(d.Title))}${d.Type === 'series' ? ' <span class="tv-badge-inline">TV</span>' : ''}</h2>
+                <div class="detail-meta">
+                    ${known(d.imdbRating) ? `<span class="imdb-chip">IMDb</span><b>${escapeHtml(d.imdbRating)}</b>` : ''}
+                    <span>${meta}</span>
                 </div>
-                ${local ? `<span class="status-pill status-${local.status}">${STATUS_LABELS[local.status]}</span>` : ''}
-                <div class="modal-info-label">Plot Summary</div>
-                <div class="modal-info-value">${escapeHtml(d.Plot)}</div>
-                <div class="info-row">
-                    <div>
-                        <div class="modal-info-label">Director</div>
-                        <div class="modal-info-value">${escapeHtml(d.Director)}</div>
-                    </div>
-                    <div>
-                        <div class="modal-info-label">Genre</div>
-                        <div class="genre-tag">${escapeHtml(d.Genre)}</div>
-                    </div>
-                </div>
-                <div class="modal-info-label">Cast</div>
-                <div class="modal-info-value">${escapeHtml(d.Actors)}</div>
-                ${local ? '' : addActions(id)}
-                <div class="btn-group">
-                    ${statusActions(id, local?.status)}
-                    <a href="https://www.imdb.com/title/${id}/" target="_blank" class="modal-btn btn-imdb">IMDb</a>
-                    <a href="${ytUrl}" target="_blank" class="modal-btn btn-yt">Trailer</a>
+                ${omdbText(d.Plot) ? `<p class="detail-plot">${escapeHtml(omdbText(d.Plot))}</p>` : ''}
+                <dl class="detail-credits">${credit('Director', d.Director)}${credit('Cast', d.Actors)}</dl>
+                <div class="detail-links">
+                    <a href="${ytUrl}" target="_blank" rel="noopener" class="pill">${ICONS.play}Trailer</a>
+                    <a href="https://www.imdb.com/title/${id}/" target="_blank" rel="noopener" class="pill">${ICONS.ext}IMDb</a>
+                    ${local ? `<button class="pill pill-danger" onclick="removeFromModal('${id}')">Remove</button>` : ''}
                 </div>
             </div>
+            <div class="picker" id="picker">${pickerHtml(id, local?.status)}</div>
         </div>`;
 }
 
-async function updateStatus(id, status) {
-    await api('status', { body: { imdb_id: id, status } });
-    fetchMovies();
-    if (status === 'archive') askImdb(id);
-    else closeModal();
+function closeModal() {
+    document.getElementById('detailsModal').classList.remove('open');
+    document.body.classList.remove('modal-open');
 }
 
-async function deleteMovie(id) {
-    if (!confirm('Remove?')) return;
-    await api('delete', { body: { imdb_id: id } });
-    fetchMovies();
-}
+document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    if (document.getElementById('detailsModal').classList.contains('open')) closeModal();
+    else if (document.body.classList.contains('search-open')) toggleSearch();
+});
+
+// ── PIN ───────────────────────────────────────────────────────────────────
 
 async function checkPin() {
     const boxes = document.querySelectorAll('.pin-box');
@@ -515,27 +599,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (boxes.length) boxes[0].focus();
 });
 
-function closeModal() {
-    document.getElementById('detailsModal').classList.remove('open');
-    document.body.classList.remove('modal-open');
-}
-
 function escapeHtml(str) {
     if (typeof str !== 'string') return str ?? '';
     return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
-
-function toggleSearch() {
-    const drawer = document.getElementById('searchDrawer');
-    const btn = document.getElementById('addBtn');
-    const isOpen = drawer.classList.toggle('open');
-    btn.classList.toggle('active', isOpen);
-    if (isOpen) {
-        setTimeout(() => document.getElementById('movieInput').focus(), 300);
-    } else {
-        document.getElementById('searchResults').classList.remove('active');
-        document.getElementById('searchResults').innerHTML = '';
-        document.getElementById('movieInput').value = '';
-        document.getElementById('clearSearch').style.display = 'none';
-    }
 }

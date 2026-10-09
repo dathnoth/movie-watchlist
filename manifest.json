@@ -4,8 +4,8 @@
   "description": "Daniel's Personal Movie Watchlist and Archive",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0b0f19",
-  "theme_color": "#38bdf8",
+  "background_color": "#000000",
+  "theme_color": "#000000",
   "icons": [
     {
       "src": "images/maskable_icon.png",
