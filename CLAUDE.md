@@ -76,7 +76,7 @@ All SQL uses prepared statements with bound parameters.
 
 - **Design** — "Poster Wall": mobile-first, true black, one colour per list (Got blue, Get violet, Watched green). A floating dock holds the tabs and a separate search button
 - **Tabbed views** — GOT (default) / GET / WATCHED, each with a large title and count
-- **Poster wall** — GOT and GET are edge-to-edge poster grids (3 across on a phone) with the rating on each poster
+- **Poster wall** — GOT and GET are tight poster grids with rounded corners (3 across on a phone) with the rating on each poster
 - **Sorting** — title / release date / rating / runtime chips, shared by the poster walls; WATCHED has its own sort, defaulting to most recently watched (grouped by month)
 - **Watched** — a "Recently" shelf of the latest posters, then list rows: thumbnail, title, watched date, year, rating
 - **Tonight's pick** — random film from GOT at the top of that tab; the dice button rerolls it

@@ -1,5 +1,5 @@
 /*
- * Poster Wall: true black, posters edge to edge, and one colour per list —
+ * Poster Wall: true black, posters in a tight grid, and one colour per list —
  * Got blue, Get violet, Watched green. Built for the phone first; wider
  * screens just get more columns. Floating controls are near-opaque rather
  * than backdrop-blurred, which rendered unreliably over the posters.
@@ -122,7 +122,8 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round
 
 /* ── Poster wall ────────────────────────────────────────────────────── */
 
-.poster-wall { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; }
+.poster-wall { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 0 18px; }
+.poster-wall .tile { border-radius: 8px; }
 
 .tile {
     position: relative; display: block; width: 100%; aspect-ratio: 2 / 3;
