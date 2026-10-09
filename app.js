@@ -1,10 +1,12 @@
 let debounceTimer;
 let currentSort = 'title';
+let watchedSort = 'watched';
 let currentView = 'got';
 let cachedMovies = [];
 let freshFilms = [];
 
-const STATUS_LABELS = { get: 'Get', got: 'Got', archive: 'Archive' };
+// 'archive' is the stored status value; the UI calls it Watched.
+const STATUS_LABELS = { get: 'Get', got: 'Got', archive: 'Watched' };
 
 function getPin() { return localStorage.getItem('vault_pin') || ''; }
 
@@ -86,7 +88,9 @@ async function liveSearch(query) {
             fallback.textContent = 'No poster';
             this.replaceWith(fallback);
         });
-        div.onclick = () => addToVault(m.imdbID);
+        // Open the detail modal so you choose where it goes (Got, Get or
+        // Watched) rather than it landing in whichever tab is open.
+        div.onclick = () => showDetails(m.imdbID);
         resultsDiv.appendChild(div);
     });
 }
@@ -205,17 +209,19 @@ async function fetchMovies() {
     const data = await api('list');
     if (!Array.isArray(data)) return;
     cachedMovies = data;
-    render(sortMovies(data));
+    render(data);
     // Re-run after each library change so anything just added drops out.
     fetchFresh();
 }
 
-function sortMovies(movies) {
+function sortMovies(movies, sort) {
     return [...movies].sort((a, b) => {
-        if (currentSort === 'title') return a.title.localeCompare(b.title);
-        if (currentSort === 'year') return (new Date(b.year).getTime() || 0) - (new Date(a.year).getTime() || 0);
-        if (currentSort === 'rating') return (parseFloat(b.rating) || 0) - (parseFloat(a.rating) || 0);
-        if (currentSort === 'runtime') return (parseInt(b.runtime) || 0) - (parseInt(a.runtime) || 0);
+        if (sort === 'title') return a.title.localeCompare(b.title);
+        if (sort === 'year') return (new Date(b.year).getTime() || 0) - (new Date(a.year).getTime() || 0);
+        if (sort === 'rating') return (parseFloat(b.rating) || 0) - (parseFloat(a.rating) || 0);
+        if (sort === 'runtime') return (parseInt(b.runtime) || 0) - (parseInt(a.runtime) || 0);
+        // Most recently watched first; rows with no date sink to the bottom.
+        if (sort === 'watched') return (b.watched_at || '').localeCompare(a.watched_at || '') || a.title.localeCompare(b.title);
         return 0;
     });
 }
@@ -227,12 +233,14 @@ function setView(view) {
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-function setSort(type) {
-    currentSort = type;
-    document.querySelectorAll('.sort-btn').forEach(btn => btn.classList.remove('active'));
-    const btnId = type === 'title' ? 'sortAlpha' : 'sort' + type.charAt(0).toUpperCase() + type.slice(1);
-    document.getElementById(btnId)?.classList.add('active');
-    render(sortMovies(cachedMovies));
+// The poster grids share one sort; the Watched list keeps its own so it can
+// default to most recently watched.
+function setSort(type, list = 'grid') {
+    if (list === 'watched') watchedSort = type;
+    else currentSort = type;
+    document.querySelectorAll(`.sort-container[data-list="${list}"] .sort-btn`)
+        .forEach(btn => btn.classList.toggle('active', btn.dataset.sort === type));
+    render(cachedMovies);
 }
 
 function formatWatchedDate(value) {
@@ -282,6 +290,9 @@ function archiveRowHtml(m) {
 function render(movies) {
     const buckets = { get: [], got: [], archive: [] };
     movies.forEach(m => (buckets[m.status] || buckets.get).push(m));
+    buckets.get = sortMovies(buckets.get, currentSort);
+    buckets.got = sortMovies(buckets.got, currentSort);
+    buckets.archive = sortMovies(buckets.archive, watchedSort);
 
     document.getElementById('getList').innerHTML = buckets.get.map(cardHtml).join('')
         || '<p class="empty-state">Nothing to track down yet.</p>';
@@ -295,8 +306,6 @@ function render(movies) {
     document.getElementById('archiveCount').textContent = buckets.archive.length;
 }
 
-// `status` is explicit when adding from the modal; otherwise it follows
-// whichever tab you are on, as it does when tapping a search result.
 async function addToVault(id, status) {
     const card = document.getElementById(`search-${id}`) || document.getElementById(`fresh-${id}`);
     if (card) card.classList.add('added-state');
@@ -313,7 +322,7 @@ async function addToVault(id, status) {
             runtime: d.Runtime,
             rating: d.imdbRating,
             genre: d.Genre,
-            status: status || (currentView === 'get' ? 'get' : 'got'),
+            status,
             is_tv_show: d.Type === 'series',
         },
     });
@@ -331,17 +340,47 @@ function statusActions(id, status) {
     if (status === 'get') return btn('got', 'Got It', 'btn-got');
     if (status === 'got') return btn('archive', 'Watched', 'btn-watched') + btn('get', 'Not On Drive', 'btn-restore');
     if (status === 'archive') return btn('got', 'Restore', 'btn-restore');
-    // Not in the library yet, so this has to insert the row. updateStatus runs
-    // an UPDATE, which would match nothing and fail silently.
-    return `<button id="addCta-${id}" onclick="addFromModal('${id}')" class="modal-btn btn-got">Add to Get</button>`;
+    return '';
 }
 
-async function addFromModal(id) {
-    const btn = document.getElementById(`addCta-${id}`);
-    if (btn) { btn.textContent = 'Adding…'; btn.disabled = true; }
-    await addToVault(id, 'get');
-    if (btn) btn.textContent = 'Added';
+// Not in the library yet, so adding has to insert the row. updateStatus runs
+// an UPDATE, which would match nothing and fail silently.
+function addActions(id) {
+    const btn = (target, label, cls) =>
+        `<button onclick="addFromModal('${id}', '${target}')" data-status="${target}" class="modal-btn ${cls}">${label}</button>`;
+    return `
+        <div class="modal-info-label add-label">Add to</div>
+        <div class="btn-group add-group" id="addGroup-${id}">
+            ${btn('got', 'Got', 'btn-got')}${btn('get', 'Get', 'btn-get')}${btn('archive', 'Watched', 'btn-watched')}
+        </div>`;
+}
+
+async function addFromModal(id, status) {
+    const group = document.getElementById(`addGroup-${id}`);
+    group?.querySelectorAll('button').forEach(b => {
+        b.disabled = true;
+        if (b.dataset.status === status) b.textContent = 'Adding…';
+    });
+    await addToVault(id, status);
+    if (status === 'archive') { askImdb(id); return; }
     setTimeout(closeModal, 500);
+}
+
+// After marking something watched, offer the IMDb page for trivia and reviews.
+// The link is a real tap target, so it opens even in the installed PWA.
+function askImdb(id) {
+    const title = cachedMovies.find(m => m.imdb_id === id)?.title
+        || document.querySelector('#modalData h2')?.textContent || 'this one';
+    document.getElementById('modalData').innerHTML = `
+        <div class="imdb-prompt">
+            <div class="imdb-prompt-check">✓</div>
+            <h2>Marked as watched</h2>
+            <p>Read the trivia and reviews for <strong>${escapeHtml(title)}</strong> on IMDb?</p>
+            <div class="btn-group">
+                <a href="https://www.imdb.com/title/${id}/" target="_blank" rel="noopener" onclick="closeModal()" class="modal-btn btn-imdb btn-imdb-primary">Open IMDb</a>
+                <button onclick="closeModal()" class="modal-btn">Not Now</button>
+            </div>
+        </div>`;
 }
 
 async function showDetails(id) {
@@ -403,6 +442,7 @@ async function showDetails(id) {
                 </div>
                 <div class="modal-info-label">Cast</div>
                 <div class="modal-info-value">${escapeHtml(d.Actors)}</div>
+                ${local ? '' : addActions(id)}
                 <div class="btn-group">
                     ${statusActions(id, local?.status)}
                     <a href="https://www.imdb.com/title/${id}/" target="_blank" class="modal-btn btn-imdb">IMDb</a>
@@ -414,8 +454,9 @@ async function showDetails(id) {
 
 async function updateStatus(id, status) {
     await api('status', { body: { imdb_id: id, status } });
-    closeModal();
     fetchMovies();
+    if (status === 'archive') askImdb(id);
+    else closeModal();
 }
 
 async function deleteMovie(id) {

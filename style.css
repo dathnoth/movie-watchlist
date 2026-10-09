@@ -346,6 +346,24 @@ h2 { font-size: 1.1rem; font-weight: 900; letter-spacing: 1px; color: var(--text
 
 .btn-got { background: rgba(56,189,248,0.15) !important; border-color: rgba(56,189,248,0.4) !important; }
 .btn-watched { background: var(--success-green) !important; border-color: rgba(34,197,94,0.4) !important; }
+.btn-get { background: rgba(167,139,250,0.15) !important; border-color: rgba(167,139,250,0.4) !important; }
+
+/* "Add to" choices sit on their own row above IMDb / Trailer. */
+.add-label { margin-top: 22px; }
+.btn-group.add-group { margin-top: 6px; }
+.add-group + .btn-group { margin-top: 10px; }
+.modal-btn:disabled { opacity: 0.6; cursor: default; }
+
+.imdb-prompt { text-align: center; padding: 10px 0 0; }
+.imdb-prompt h2 { margin: 12px 0 8px; }
+.imdb-prompt p { color: #94a3b8; font-size: 0.9rem; line-height: 1.5; margin: 0; }
+.imdb-prompt strong { color: var(--text); }
+.modal-btn.btn-imdb-primary { background: #f5c518; border-color: #f5c518; color: #0b0f19; }
+.imdb-prompt-check {
+    width: 52px; height: 52px; margin: 0 auto; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.5rem; font-weight: 900; color: #fff; background: var(--success-green);
+}
 
 @media (max-width: 600px) {
     .movie-grid { grid-template-columns: repeat(2, 1fr); gap: 15px; }

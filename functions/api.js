@@ -243,6 +243,9 @@ export async function onRequest(context) {
       const v = body[f];
       if (f === 'is_tv_show') return v ? 1 : 0;
       if (f === 'status') return STATUSES.includes(v) ? v : 'get';
+      // Adding straight to Watched (seen it at the cinema) dates it today.
+      // Existing rows keep theirs: the conflict branch never touches it.
+      if (f === 'watched_at') return body.status === 'archive' ? new Date().toISOString().split('T')[0] : null;
       return v ?? null;
     });
 

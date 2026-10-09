@@ -26,7 +26,7 @@ Two tables. `movies` is the library — schema in `migrations/0001_init.sql`, wi
 | `plot`, `director`, `actors`, `trailer` | TEXT | mostly unused — modal reads these live from OMDB |
 | `votes`, `my_stars` | INTEGER | |
 | `is_tv_show` | INTEGER | 0/1, coerced to boolean in the API response |
-| `watched_at` | TEXT | `YYYY-MM-DD`, set when status → `'archive'`, cleared otherwise |
+| `watched_at` | TEXT | `YYYY-MM-DD`, set when status → `'archive'` (or a movie is added straight to it), cleared otherwise |
 
 Apply migrations with:
 
@@ -42,9 +42,9 @@ Three states, all driven from the movie detail modal:
 
 - **GET** — want to procure, not on the drive yet
 - **GOT** — on the hard drive, browsable, ready to watch (the default view)
-- **ARCHIVE** — already watched
+- **WATCHED** — already watched. Stored as `'archive'` in the database; only the UI says Watched
 
-Adding a movie from search assigns the status of whichever view is active (GET if on the GET tab, otherwise GOT).
+Tapping a search result or Fresh Find opens the detail modal, which offers Got / Get / Watched for anything not yet in the library (Watched covers films seen at the cinema). Moving a movie to Watched — or adding it there — swaps the modal for a prompt offering the IMDb page.
 
 ## Auth
 
@@ -74,9 +74,9 @@ All SQL uses prepared statements with bound parameters.
 
 ## Key Features
 
-- **Tabbed views** — GOT (default) / GET / ARCHIVE, counts in the tab bar
-- **Sorting** — title / release date / rating / runtime, applies to the poster grids
-- **Archive** — compact list rows: thumbnail, title, year·runtime, watched date, rating
+- **Tabbed views** — GOT (default) / GET / WATCHED, counts in the tab bar
+- **Sorting** — title / release date / rating / runtime, shared by the poster grids; WATCHED has its own sort, defaulting to most recently watched
+- **Watched** — compact list rows: thumbnail, title, year·runtime, watched date, rating
 - **Movie roulette** — random pick from GOT only; hidden on other tabs
 - **Search** — TMDB via the Function proxy, debounced 300ms; results already in the library are badged with their status
 
