@@ -85,7 +85,6 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round
 .round-btn svg { width: 20px; height: 20px; }
 .round-btn:active { transform: scale(0.94); }
 .round-btn:disabled { opacity: 0.45; cursor: default; }
-.head-actions { display: flex; gap: 8px; }
 /* A film marked Got was not in the last folder check. */
 .round-btn.scan-alert { position: relative; }
 .round-btn.scan-alert::after {
@@ -172,31 +171,6 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round
 }
 .status-get { background: var(--get); color: #000; }
 .status-archive { background: var(--seen); color: #000; }
-
-/* ── Tonight's pick ─────────────────────────────────────────────────── */
-
-.pick-card {
-    position: relative; isolation: isolate; overflow: hidden;
-    display: flex; gap: 14px; width: calc(100% - 36px); margin: 0 18px 16px; padding: 14px;
-    border-radius: 20px; border: 1px solid var(--line); background: var(--surface);
-    text-align: left; cursor: pointer;
-}
-.pick-blur {
-    position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: -1;
-    filter: blur(24px) brightness(0.55) saturate(1.5); transform: scale(1.4);
-}
-.pick-cover {
-    flex: none; width: 92px; height: 138px; object-fit: cover; border-radius: 10px;
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
-}
-.pick-text { display: flex; flex-direction: column; min-width: 0; }
-.pick-text small { font-size: 11px; font-weight: 700; color: var(--got); letter-spacing: 0.5px; text-transform: uppercase; }
-.pick-text b { font-size: 21px; letter-spacing: -0.4px; line-height: 1.15; margin: 4px 0; }
-.pick-text > span { font-size: 13px; color: #d1d1d6; }
-.pick-text .pick-open {
-    margin-top: auto; align-self: flex-start; padding: 8px 14px; border-radius: 99px;
-    background: #fff; color: #000; font-size: 13px; font-weight: 700;
-}
 
 /* ── Watched ────────────────────────────────────────────────────────── */
 
@@ -533,7 +507,6 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round
     .poster-wall .tile { border-radius: 10px; }
     .search-wall { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); max-width: 1100px; margin: 0 auto; }
     .search-bar { max-width: 1100px; margin: 0 auto; }
-    .pick-card { max-width: 560px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -5,7 +5,6 @@ let currentView = 'got';
 let cachedMovies = [];
 let freshFilms = [];
 let searchHits = [];
-let pickId = null;
 let scanReport = null;
 let scanReady = false;
 // OMDB detail fetched for the open modal, reused when adding so it isn't fetched twice.
@@ -368,45 +367,13 @@ function render(movies) {
     document.getElementById('getSub').textContent = `${plural(buckets.get.length, 'film')} to track down`;
     document.getElementById('archiveSub').textContent = `${plural(buckets.archive.length, 'film')} seen`;
 
-    renderPick(buckets.got);
-    updateBackdrop();
-}
-
-// ── Tonight's pick ────────────────────────────────────────────────────────
-
-// A random film from Got, kept until it leaves Got or you roll again.
-function renderPick(got) {
-    const card = document.getElementById('pickCard');
-    if (got.length === 0) { card.hidden = true; pickId = null; return; }
-    if (!got.some((m) => m.imdb_id === pickId)) pickId = got[Math.floor(Math.random() * got.length)].imdb_id;
-
-    const m = got.find((x) => x.imdb_id === pickId);
-    const meta = [yearOf(m), known(m.runtime), known(m.rating) ? `★ ${m.rating}` : ''].filter(Boolean).join(' · ');
-    card.hidden = false;
-    card.innerHTML = `
-        ${known(m.poster) ? `<img class="pick-blur" src="${escapeHtml(m.poster)}" alt=""><img class="pick-cover" src="${escapeHtml(m.poster)}" alt="">` : ''}
-        <span class="pick-text">
-            <small>Tonight's pick</small>
-            <b>${escapeHtml(m.title)}</b>
-            <span>${escapeHtml(meta)}</span>
-            <span class="pick-open">See details</span>
-        </span>`;
-    card.onclick = () => showDetails(m.imdb_id);
-}
-
-function rollPick() {
-    const got = cachedMovies.filter((m) => m.status === 'got');
-    if (got.length < 2) return;
-    const others = got.filter((m) => m.imdb_id !== pickId);
-    pickId = others[Math.floor(Math.random() * others.length)].imdb_id;
-    renderPick(got);
     updateBackdrop();
 }
 
 // Tint the top of the screen with the poster leading the current view.
 function updateBackdrop() {
     let lead;
-    if (currentView === 'got') lead = cachedMovies.find((m) => m.imdb_id === pickId);
+    if (currentView === 'got') lead = sortMovies(cachedMovies.filter((m) => m.status === 'got'), currentSort)[0];
     else if (currentView === 'get') lead = sortMovies(cachedMovies.filter((m) => m.status === 'get'), currentSort)[0] || freshFilms[0];
     else lead = sortMovies(cachedMovies.filter((m) => m.status === 'archive'), 'watched')[0];
 

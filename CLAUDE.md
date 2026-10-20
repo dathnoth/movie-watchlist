@@ -79,7 +79,6 @@ All SQL uses prepared statements with bound parameters.
 - **Poster wall** — GOT and GET are tight poster grids with rounded corners (3 across on a phone) with the rating on each poster
 - **Sorting** — title / release date / rating / runtime chips, shared by the poster walls; WATCHED has its own sort, defaulting to most recently watched (grouped by month)
 - **Watched** — a "Recently" shelf of the latest posters, then list rows: thumbnail, title, watched date, year, rating
-- **Tonight's pick** — random film from GOT at the top of that tab; the dice button rerolls it
 - **Search** — full-screen sheet; TMDB via the Function proxy, debounced 300ms; results already in the library are badged with their status
 
 ## Local development

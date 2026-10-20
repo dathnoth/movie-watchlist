@@ -35,14 +35,9 @@
                         <p class="view-sub" id="gotSub"></p>
                         <h1 class="view-title">Got</h1>
                     </div>
-                    <div class="head-actions">
-                        <button id="scanBtn" class="round-btn" type="button" hidden onclick="scanFolder()" aria-label="Scan movies folder">
-                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8.5V18a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V10a2 2 0 0 0-2-2h-6l-1.5-1.5H6A2 2 0 0 0 4 8.5z"/></svg>
-                        </button>
-                        <button class="round-btn" type="button" onclick="rollPick()" aria-label="Pick another film">
-                            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="4"/><circle cx="8.5" cy="8.5" r="1.3"/><circle cx="15.5" cy="15.5" r="1.3"/><circle cx="12" cy="12" r="1.3"/></svg>
-                        </button>
-                    </div>
+                    <button id="scanBtn" class="round-btn" type="button" hidden onclick="scanFolder()" aria-label="Scan movies folder">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8.5V18a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V10a2 2 0 0 0-2-2h-6l-1.5-1.5H6A2 2 0 0 0 4 8.5z"/></svg>
+                    </button>
                 </header>
                 <div class="chips sort-container" data-list="grid">
                     <button class="chip sort-btn active" data-sort="title" onclick="setSort('title')">A–Z</button>
@@ -50,7 +45,6 @@
                     <button class="chip sort-btn" data-sort="rating" onclick="setSort('rating')">Rating</button>
                     <button class="chip sort-btn" data-sort="runtime" onclick="setSort('runtime')">Runtime</button>
                 </div>
-                <button id="pickCard" class="pick-card" hidden></button>
                 <div id="gotList" class="poster-wall"></div>
             </section>
 
