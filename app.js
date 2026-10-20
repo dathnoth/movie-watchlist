@@ -6,6 +6,8 @@ let cachedMovies = [];
 let freshFilms = [];
 let searchHits = [];
 let pickId = null;
+let scanReport = null;
+let scanReady = false;
 // OMDB detail fetched for the open modal, reused when adding so it isn't fetched twice.
 const detailCache = {};
 
@@ -72,8 +74,10 @@ function tileInner({ title, poster, rating, tv, badge }) {
 }
 
 function libraryTile(m) {
-    return `<button class="tile" onclick="showDetails('${m.imdb_id}')" aria-label="${escapeHtml(m.title)}">
-        ${tileInner({ title: m.title, poster: m.poster, rating: m.rating, tv: m.is_tv_show })}</button>`;
+    const missing = m.status === 'got' && scanMissingIds().has(m.imdb_id);
+    return `<button class="tile" onclick="showDetails('${m.imdb_id}')" aria-label="${escapeHtml(m.title)}${missing ? ', missing from the movies folder' : ''}">
+        ${tileInner({ title: m.title, poster: m.poster, rating: m.rating, tv: m.is_tv_show })}
+        ${missing ? '<span class="tile-missing">Missing</span>' : ''}</button>`;
 }
 
 const SKELETON_TILES = Array(9).fill('<span class="tile skeleton-shimmer"></span>').join('');
@@ -144,6 +148,7 @@ function renderSearch() {
 
 function toggleSearch() {
     const sheet = document.getElementById('searchSheet');
+    if (!sheet.classList.contains('open') && document.body.classList.contains('scan-open')) closeScan();
     const isOpen = sheet.classList.toggle('open');
     sheet.setAttribute('aria-hidden', String(!isOpen));
     document.getElementById('addBtn').classList.toggle('active', isOpen);
@@ -249,6 +254,9 @@ async function fetchMovies() {
     const data = await api('list');
     if (!Array.isArray(data)) return;
     cachedMovies = data;
+    scanReady = true;
+    const scanBtn = document.getElementById('scanBtn');
+    if (scanBtn && !scanBtn.hidden) scanBtn.disabled = false;
     render(data);
     // Owned badges on open search results follow the library.
     if (searchHits.length) renderSearch();
@@ -273,6 +281,7 @@ function setView(view) {
     document.querySelectorAll('.view-tab').forEach(t => t.classList.toggle('active', t.dataset.view === view));
     document.querySelectorAll('.view-panel').forEach(p => p.classList.toggle('active', p.id === `view-${view}`));
     if (document.body.classList.contains('search-open')) toggleSearch();
+    if (document.body.classList.contains('scan-open')) closeScan();
     updateBackdrop();
     window.scrollTo({ top: 0 });
 }
@@ -351,7 +360,11 @@ function render(movies) {
             <span class="shelf-date">${formatWatchedDate(m.watched_at, { day: 'numeric', month: 'short' })}</span>
         </button>`).join('');
 
-    document.getElementById('gotSub').textContent = `${plural(buckets.got.length, 'film')} on the drive`;
+    const missingCount = buckets.got.filter((m) => scanMissingIds().has(m.imdb_id)).length;
+    document.getElementById('gotSub').textContent = missingCount
+        ? `${plural(buckets.got.length, 'film')} on the drive · ${missingCount} missing from the folder`
+        : `${plural(buckets.got.length, 'film')} on the drive`;
+    syncScanAlert();
     document.getElementById('getSub').textContent = `${plural(buckets.get.length, 'film')} to track down`;
     document.getElementById('archiveSub').textContent = `${plural(buckets.archive.length, 'film')} seen`;
 
@@ -544,6 +557,7 @@ function closeModal() {
 document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
     if (document.getElementById('detailsModal').classList.contains('open')) closeModal();
+    else if (document.body.classList.contains('scan-open')) closeScan();
     else if (document.body.classList.contains('search-open')) toggleSearch();
 });
 
@@ -603,3 +617,352 @@ function escapeHtml(str) {
     if (typeof str !== 'string') return str ?? '';
     return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
+
+// ── Folder check ──────────────────────────────────────────────────────────
+// The movies folder stays on this computer. Chromium can remember a
+// read-only directory handle; other desktop browsers re-pick each time.
+
+const SCAN_KEY = 'vault_scan';
+const HANDLE_DB = 'movievault-scan';
+
+function readStoredScan() {
+    try {
+        const data = JSON.parse(localStorage.getItem(SCAN_KEY) || 'null');
+        return data && typeof data === 'object' ? data : null;
+    } catch {
+        return null;
+    }
+}
+
+function scanMissingIds() {
+    return new Set((scanReport?.missing || []).map((movie) => movie.imdb_id));
+}
+
+function rememberScan(report) {
+    scanReport = {
+        folderName: report.folderName || '',
+        scannedAt: report.scannedAt || new Date().toISOString(),
+        missing: report.missing || [],
+        moves: report.moves || [],
+        unknown: report.unknown || [],
+        already: report.already || 0,
+        watched: report.watched || 0,
+        tvSkipped: report.tvSkipped || 0,
+    };
+    localStorage.setItem(SCAN_KEY, JSON.stringify(scanReport));
+}
+
+function desktopScanMode() {
+    const desktop = window.matchMedia('(hover: hover) and (pointer: fine) and (min-width: 800px)').matches;
+    if (!desktop) return '';
+    if (typeof window.showDirectoryPicker === 'function') return 'handle';
+    if ('webkitdirectory' in document.createElement('input')) return 'input';
+    return '';
+}
+
+function syncScanButton() {
+    const btn = document.getElementById('scanBtn');
+    if (!btn) return;
+    const mode = desktopScanMode();
+    btn.hidden = !mode;
+    btn.disabled = !mode || !scanReady;
+    btn.dataset.mode = mode;
+    syncScanAlert();
+}
+
+function syncScanAlert() {
+    const btn = document.getElementById('scanBtn');
+    if (!btn) return;
+    const missing = scanMissingIds().size;
+    btn.classList.toggle('scan-alert', missing > 0);
+    const folder = scanReport?.folderName;
+    btn.setAttribute('aria-label', missing
+        ? `Scan ${folder || 'movies folder'}, ${missing} missing`
+        : `Scan ${folder || 'movies folder'}`);
+}
+
+function openHandleDb() {
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.open(HANDLE_DB, 1);
+        request.onupgradeneeded = () => request.result.createObjectStore('handles');
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+    });
+}
+
+async function loadMoviesHandle() {
+    try {
+        const db = await openHandleDb();
+        return await new Promise((resolve, reject) => {
+            const request = db.transaction('handles').objectStore('handles').get('movies');
+            request.onsuccess = () => resolve(request.result || null);
+            request.onerror = () => reject(request.error);
+        });
+    } catch {
+        return null;
+    }
+}
+
+async function saveMoviesHandle(handle) {
+    const db = await openHandleDb();
+    await new Promise((resolve, reject) => {
+        const request = db.transaction('handles', 'readwrite').objectStore('handles').put(handle, 'movies');
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+    });
+}
+
+async function allowHandle(handle) {
+    const opts = { mode: 'read' };
+    if (await handle.queryPermission(opts) === 'granted') return true;
+    return await handle.requestPermission(opts) === 'granted';
+}
+
+async function pickMoviesDirectory() {
+    const base = { mode: 'read', id: 'movievault-movies' };
+    try {
+        return await window.showDirectoryPicker({ ...base, startIn: 'videos' });
+    } catch (err) {
+        if (!err || err.name === 'AbortError' || err.name === 'SecurityError') throw err;
+        return window.showDirectoryPicker(base);
+    }
+}
+
+async function scanFolder(opts = {}) {
+    const mode = desktopScanMode();
+    if (!mode || !scanReady) return;
+    if (mode === 'input') {
+        const input = document.getElementById('scanInput');
+        input.value = '';
+        input.onchange = async () => {
+            const paths = [...input.files].map((file) => file.webkitRelativePath || file.name);
+            if (!paths.length) return;
+            const built = directoryHandleFromPaths(paths);
+            const btn = document.getElementById('scanBtn');
+            btn.disabled = true;
+            try {
+                await finishScan(built.handle, built.folderName || 'Movies');
+            } finally {
+                btn.disabled = false;
+            }
+        };
+        input.click();
+        return;
+    }
+
+    const btn = document.getElementById('scanBtn');
+    btn.disabled = true;
+    btn.setAttribute('aria-busy', 'true');
+    try {
+        let handle = null;
+        if (!opts.repick) handle = await loadMoviesHandle();
+        if (handle) {
+            try {
+                if (!(await allowHandle(handle))) handle = null;
+            } catch {
+                handle = null;
+            }
+        }
+        if (!handle) handle = await pickMoviesDirectory();
+        await saveMoviesHandle(handle);
+        await finishScan(handle, handle.name);
+    } catch (err) {
+        if (err && (err.name === 'AbortError' || err.name === 'SecurityError')) return;
+        openScan({ error: 'Could not read that folder. Choose it again and allow access.' });
+    } finally {
+        btn.disabled = false;
+        btn.removeAttribute('aria-busy');
+    }
+}
+
+async function finishScan(handle, folderName) {
+    openScan({ pending: true, folderName });
+    try {
+        const entries = await collectMovieEntries(handle);
+        if (!entries.length) {
+            openScan({
+                error: 'No movie folders in there. Got was left as it is.',
+                folderName,
+            });
+            return;
+        }
+        const report = compareLibrary(cachedMovies, entries);
+        report.folderName = folderName;
+        report.scannedAt = new Date().toISOString();
+        rememberScan(report);
+        render(cachedMovies);
+        renderScan(scanReport);
+    } catch {
+        openScan({ error: 'Could not read that folder. Choose it again and allow access.', folderName });
+    }
+}
+
+function openScan(report) {
+    if (document.body.classList.contains('search-open')) toggleSearch();
+    const sheet = document.getElementById('scanSheet');
+    sheet.classList.add('open');
+    sheet.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('scan-open');
+    renderScan(report);
+}
+
+function closeScan() {
+    const sheet = document.getElementById('scanSheet');
+    sheet.classList.remove('open');
+    sheet.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('scan-open');
+}
+
+function scanSummaryText(report) {
+    if (report.note) return report.note;
+    const parts = [];
+    if (report.moves.length) parts.push(`${plural(report.moves.length, 'film')} to move to Got`);
+    if (report.missing.length) parts.push(`${plural(report.missing.length, 'film')} missing`);
+    if (report.unknown.length) parts.push(`${report.unknown.length} not in your library`);
+    if (report.already) parts.push(`${report.already} already in Got`);
+    if (report.watched) parts.push(`${report.watched} left on Watched`);
+    let text = parts.length ? parts.join(' · ') : 'This folder matched nothing in your library.';
+    if (report.tvSkipped) text += `${text.endsWith('.') ? '' : '.'} TV on Got is not part of this check.`;
+    return text;
+}
+
+function scanMeta(movie) {
+    return [movie.year, movie.folder, movie.note].filter(Boolean).join(' · ');
+}
+
+function renderScan(report) {
+    document.getElementById('scanFolderName').textContent = report.folderName || 'Movies folder';
+    const summary = document.getElementById('scanSummary');
+    const apply = document.getElementById('scanApply');
+    const body = document.getElementById('scanBody');
+
+    if (report.pending) {
+        summary.textContent = '';
+        apply.hidden = true;
+        document.getElementById('scanRepick').disabled = true;
+        body.innerHTML = '<p class="scan-status">Reading the folder…</p>';
+        return;
+    }
+    if (report.error) {
+        summary.textContent = '';
+        apply.hidden = true;
+        document.getElementById('scanRepick').disabled = false;
+        body.innerHTML = `<p class="scan-status">${escapeHtml(report.error)}</p>`;
+        return;
+    }
+
+    summary.textContent = scanSummaryText(report);
+    document.getElementById('scanRepick').disabled = false;
+    const moves = report.moves || [];
+    apply.hidden = moves.length === 0;
+    apply.disabled = false;
+    apply.textContent = `Move ${moves.length} to Got`;
+
+    const allRow = moves.length > 1 ? `
+        <label class="scan-row">
+            <input id="scanAll" type="checkbox" checked>
+            <span><b>All of them</b></span>
+        </label>` : '';
+    const moveRows = allRow + moves.map((movie) => `
+        <label class="scan-row">
+            <input class="scan-move" type="checkbox" value="${escapeHtml(movie.imdb_id)}" checked>
+            <span><b>${escapeHtml(movie.title)}</b><span class="scan-meta">${escapeHtml(scanMeta(movie))}</span></span>
+        </label>`).join('');
+    const missingRows = (report.missing || []).map((movie) => `
+        <button type="button" class="scan-row" data-open="${escapeHtml(movie.imdb_id)}">
+            <span><b>${escapeHtml(movie.title)}</b><span class="scan-meta">${escapeHtml(movie.year || 'No year')}</span></span>
+        </button>`).join('');
+    const unknownRows = (report.unknown || []).map((folder) => `
+        <button type="button" class="scan-row" data-search="${escapeHtml(folder.title || folder.name)}">
+            <span><b>${escapeHtml(folder.name)}</b>${folder.note ? `<span class="scan-meta">${escapeHtml(folder.note)}</span>` : ''}</span>
+            <span class="scan-go">Search</span>
+        </button>`).join('');
+
+    const block = (title, count, note, rows) => rows ? `
+        <section class="scan-block">
+            <h3>${title} <small>${count}</small></h3>
+            <p class="scan-note">${note}</p>
+            ${rows}
+        </section>` : '';
+
+    body.innerHTML = [
+        block('Move to Got', moves.length, 'In the folder, and still on your Get list.', moveRows),
+        block('Missing from the folder', (report.missing || []).length, 'Still marked Got. No folder matched.', missingRows),
+        block('Not in your library', (report.unknown || []).length, 'No saved film uses this name.', unknownRows),
+    ].join('') || '<p class="scan-status">Nothing to change.</p>';
+    updateScanApply();
+}
+
+function updateScanApply() {
+    const apply = document.getElementById('scanApply');
+    if (!apply || apply.hidden) return;
+    const count = document.querySelectorAll('.scan-move:checked').length;
+    apply.disabled = count === 0;
+    apply.textContent = count ? `Move ${count} to Got` : 'Move to Got';
+}
+
+async function applyScanMoves() {
+    const ids = [...document.querySelectorAll('.scan-move:checked')].map((box) => box.value);
+    if (!ids.length || !scanReport) return;
+    const apply = document.getElementById('scanApply');
+    apply.disabled = true;
+    apply.textContent = 'Moving…';
+
+    const moved = [];
+    try {
+        for (const id of ids) {
+            await api('status', { body: { imdb_id: id, status: 'got' } });
+            moved.push(id);
+        }
+    } catch {
+        // A 401 logs out. Anything else keeps the films that did move.
+    }
+
+    if (!moved.length) {
+        apply.disabled = false;
+        apply.textContent = 'Try again';
+        return;
+    }
+
+    const done = new Set(moved);
+    cachedMovies.forEach((movie) => { if (done.has(movie.imdb_id)) movie.status = 'got'; });
+    scanReport.moves = (scanReport.moves || []).filter((movie) => !done.has(movie.imdb_id));
+    scanReport.already = (scanReport.already || 0) + moved.length;
+    rememberScan(scanReport);
+    scanReport.note = `Moved ${plural(moved.length, 'film')} to Got.`;
+    if (ids.length !== moved.length) scanReport.note += ' The rest did not save.';
+    try { await fetchMovies(); } catch { render(cachedMovies); }
+    renderScan(scanReport);
+}
+
+document.getElementById('scanBody').addEventListener('click', (event) => {
+    const open = event.target.closest('[data-open]');
+    if (open) { showDetails(open.dataset.open); return; }
+    const search = event.target.closest('[data-search]');
+    if (search) searchFromScan(search.dataset.search);
+});
+
+document.getElementById('scanBody').addEventListener('change', (event) => {
+    if (event.target.id === 'scanAll') {
+        document.querySelectorAll('.scan-move').forEach((box) => { box.checked = event.target.checked; });
+        updateScanApply();
+        return;
+    }
+    if (event.target.classList.contains('scan-move')) {
+        const all = document.getElementById('scanAll');
+        if (all) all.checked = [...document.querySelectorAll('.scan-move')].every((box) => box.checked);
+        updateScanApply();
+    }
+});
+
+function searchFromScan(title) {
+    closeScan();
+    if (!document.body.classList.contains('search-open')) toggleSearch();
+    const input = document.getElementById('movieInput');
+    input.value = title;
+    input.dispatchEvent(new Event('input'));
+}
+
+scanReport = readStoredScan();
+syncScanButton();
+window.addEventListener('resize', syncScanButton);

@@ -30,7 +30,7 @@ body {
     margin: 0; padding: 0; -webkit-tap-highlight-color: transparent;
     -webkit-font-smoothing: antialiased; overflow-x: hidden;
 }
-body.modal-open, body.search-open { overflow: hidden; }
+body.modal-open, body.search-open, body.scan-open { overflow: hidden; }
 
 button { font: inherit; color: inherit; }
 svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
@@ -84,6 +84,15 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round
 }
 .round-btn svg { width: 20px; height: 20px; }
 .round-btn:active { transform: scale(0.94); }
+.round-btn:disabled { opacity: 0.45; cursor: default; }
+.head-actions { display: flex; gap: 8px; }
+/* A film marked Got was not in the last folder check. */
+.round-btn.scan-alert { position: relative; }
+.round-btn.scan-alert::after {
+    content: ""; position: absolute; top: 7px; right: 7px;
+    width: 8px; height: 8px; border-radius: 50%; background: #ffb020;
+    box-shadow: 0 0 0 2px var(--glass);
+}
 
 .section-head {
     display: flex; align-items: baseline; justify-content: space-between;
@@ -156,6 +165,11 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round
 .tile-tv + .tile-owned { top: 28px; }
 
 .status-got { background: var(--got); color: #000; }
+.tile-missing {
+    position: absolute; top: 6px; right: 6px; padding: 2px 6px; border-radius: 5px;
+    background: #ffb020; color: #000;
+    font-size: 10px; font-weight: 800; letter-spacing: 0.3px; text-transform: uppercase;
+}
 .status-get { background: var(--get); color: #000; }
 .status-archive { background: var(--seen); color: #000; }
 
@@ -331,6 +345,48 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round
     margin-top: 6px; font-size: 12.5px; font-weight: 600; line-height: 1.25;
 }
 .search-year { display: block; font-size: 11.5px; color: var(--dim); margin-top: 2px; }
+
+/* ── Folder check ───────────────────────────────────────────────────── */
+
+.scan-sheet {
+    position: fixed; inset: 0; z-index: 1500; background: var(--bg);
+    overflow-y: auto;
+    visibility: hidden; opacity: 0; transform: translateY(24px);
+    transition: opacity 0.2s, transform 0.25s, visibility 0s 0.25s;
+}
+.scan-sheet.open { visibility: visible; opacity: 1; transform: none; transition: opacity 0.2s, transform 0.25s; }
+.scan-inner { max-width: 720px; margin: 0 auto; padding-bottom: calc(120px + var(--safe-bottom)); }
+.scan-head {
+    display: flex; align-items: flex-end; justify-content: space-between; gap: 12px;
+    padding: calc(var(--safe-top) + 22px) 18px 0;
+}
+.scan-summary { margin: 10px 18px 0; color: var(--dim); font-size: 14px; line-height: 1.45; }
+.scan-actions { display: flex; flex-wrap: wrap; gap: 8px; padding: 16px 18px 0; }
+.scan-primary, .scan-secondary {
+    height: 44px; padding: 0 18px; border-radius: 99px; cursor: pointer;
+    font-size: 14px; font-weight: 700;
+}
+.scan-primary { border: 0; background: var(--got); color: #000; font-weight: 800; }
+.scan-primary:disabled { opacity: 0.4; cursor: default; }
+.scan-secondary { background: var(--glass); border: 1px solid var(--line); color: var(--text); }
+.scan-status { margin: 28px 18px; color: var(--dim); font-size: 15px; }
+.scan-block { margin: 22px 18px 0; }
+.scan-block h3 {
+    display: flex; align-items: baseline; justify-content: space-between;
+    margin: 0; font-size: 18px; font-weight: 800; letter-spacing: -0.3px;
+}
+.scan-block h3 small { font-size: 13px; color: var(--dim); font-weight: 600; }
+.scan-block .scan-note { margin: 4px 0 0; color: var(--dim); font-size: 13px; }
+.scan-row {
+    display: flex; align-items: center; gap: 12px; width: 100%;
+    padding: 12px 0; border: 0; border-top: 1px solid var(--line);
+    background: none; color: inherit; text-align: left; cursor: pointer;
+}
+.scan-block .scan-row:first-of-type { margin-top: 8px; }
+.scan-row b { display: block; font-size: 15px; font-weight: 700; }
+.scan-meta { display: block; margin-top: 2px; color: var(--dim); font-size: 13px; }
+.scan-row input { width: 18px; height: 18px; margin: 0; accent-color: var(--got); flex: none; }
+.scan-go { margin-left: auto; color: var(--dim); font-size: 13px; font-weight: 700; flex: none; }
 
 /* ── Detail ─────────────────────────────────────────────────────────── */
 
