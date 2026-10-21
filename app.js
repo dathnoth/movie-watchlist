@@ -21,6 +21,7 @@ const ICONS = {
     get: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3.5h12v17l-6-4-6 4z"/></svg>',
     archive: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
     play: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l13-7.5z"/></svg>',
+    download: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7.5 11.5L12 16l4.5-4.5M5 20h14"/></svg>',
     ext: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>',
     check: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
 };
@@ -490,6 +491,10 @@ async function showDetails(id) {
 
     const local = cachedMovies.find(m => m.imdb_id === id);
     const ytUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(d.Title + ' trailer')}`;
+    // GET is the "still need a copy" list, so the torrent search lives there.
+    const torrentUrl = local?.status === 'get'
+        ? `https://rargb.to/search/?search=${encodeURIComponent(omdbText(d.Title))}`
+        : '';
     const meta = [known(d.Released) || known(d.Year), known(d.Runtime), known(d.Genre).split(',')[0]]
         .filter(Boolean).map(escapeHtml).join(' · ');
     const credit = (label, value) => omdbText(value)
@@ -509,6 +514,7 @@ async function showDetails(id) {
                 <div class="detail-links">
                     <a href="${ytUrl}" target="_blank" rel="noopener" class="pill">${ICONS.play}Trailer</a>
                     <a href="https://www.imdb.com/title/${id}/" target="_blank" rel="noopener" class="pill">${ICONS.ext}IMDb</a>
+                    ${torrentUrl ? `<a href="${torrentUrl}" target="_blank" rel="noopener" class="pill">${ICONS.download}Torrent</a>` : ''}
                     ${local ? `<button class="pill pill-danger" onclick="removeFromModal('${id}')">Remove</button>` : ''}
                 </div>
             </div>
