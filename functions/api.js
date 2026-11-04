@@ -175,6 +175,200 @@ async function getFresh(env) {
   return { films: films.filter((f) => !have.has(f.imdb_id)) };
 }
 
+async function searchTitles(q, env) {
+  const tmdbKey = env.TMDB_API_KEY ? normaliseKey(env.TMDB_API_KEY) : '';
+  if (tmdbKey) {
+    try {
+      return { Search: await searchTmdb(q, tmdbKey) };
+    } catch (err) {
+      console.log(`TMDB search failed, falling back to OMDB: ${err.message}`);
+    }
+  }
+  const res = await fetch(
+    `https://www.omdbapi.com/?s=${encodeURIComponent(q)}&apikey=${env.OMDB_API_KEY}`
+  );
+  return res.json();
+}
+
+async function fetchDetail(id, env) {
+  const res = await fetch(
+    `https://www.omdbapi.com/?i=${encodeURIComponent(id)}&apikey=${env.OMDB_API_KEY}&plot=short`
+  );
+  return res.json();
+}
+
+function todayISO() {
+  return new Date().toISOString().split('T')[0];
+}
+
+// ── Bot API ─────────────────────────────────────────────────────────────────
+// For Dodo (or any chat bot): read the library and add, move or remove films
+// by title. Authenticated with a long `DODO_API_KEY` bearer token rather than
+// the 4-digit PIN. Speaks "watched" rather than the stored 'archive'.
+
+const BOT_STATUS_IN = { get: 'get', got: 'got', watched: 'archive', archive: 'archive' };
+const BOT_STATUS_OUT = { get: 'get', got: 'got', archive: 'watched' };
+
+function botMovie(m) {
+  return {
+    imdb_id: m.imdb_id,
+    title: m.title,
+    year: (String(m.year || '').match(/\d{4}/) || [null])[0],
+    status: BOT_STATUS_OUT[m.status],
+    rating: m.rating && m.rating !== 'N/A' ? m.rating : null,
+    runtime: m.runtime && m.runtime !== 'N/A' ? m.runtime : null,
+    genre: m.genre && m.genre !== 'N/A' ? m.genre : null,
+    is_tv_show: !!m.is_tv_show,
+    watched_at: m.watched_at || null,
+  };
+}
+
+// Finds a film already in the library: by imdb_id, else an exact title
+// (optionally narrowed by year), else a partial title. More than one hit is
+// returned as-is so the caller can ask which was meant.
+async function findInLibrary(env, { imdb_id, title, year }) {
+  if (imdb_id) {
+    const row = await env.DB.prepare('SELECT * FROM movies WHERE imdb_id = ?').bind(imdb_id).first();
+    return row ? [row] : [];
+  }
+  const needle = String(title || '').trim();
+  if (!needle) return [];
+  const byYear = (rows) => (year ? rows.filter((m) => String(m.year || '').includes(String(year))) : rows);
+
+  const { results: exact } = await env.DB.prepare(
+    'SELECT * FROM movies WHERE title = ? COLLATE NOCASE ORDER BY title COLLATE NOCASE'
+  ).bind(needle).all();
+  if (byYear(exact).length) return byYear(exact);
+
+  const { results: partial } = await env.DB.prepare(
+    "SELECT * FROM movies WHERE title LIKE ? ESCAPE '\\' ORDER BY title COLLATE NOCASE"
+  ).bind(`%${needle.replace(/[\\%_]/g, (c) => `\\${c}`)}%`).all();
+  return byYear(partial);
+}
+
+// Picks the best search hit for a title: an exact title match (and year, when
+// given) wins, otherwise the top result.
+function pickResult(results, title, year) {
+  const t = String(title).trim().toLowerCase();
+  const y = year ? String(year) : null;
+  return results.find((r) => r.Title.toLowerCase() === t && (!y || r.Year.startsWith(y)))
+    || (y && results.find((r) => r.Year.startsWith(y)))
+    || results.find((r) => r.Title.toLowerCase() === t)
+    || results[0];
+}
+
+async function handleBot(request, env, searchParams) {
+  const botKey = typeof env.DODO_API_KEY === 'string' ? env.DODO_API_KEY.trim() : '';
+  const given = normaliseKey(request.headers.get('authorization') || '');
+  if (!botKey) return json({ error: 'DODO_API_KEY is not configured' }, 500);
+  if (given !== botKey) return json({ error: 'unauthorized' }, 401);
+
+  if (request.method === 'GET') {
+    const filter = searchParams.get('status');
+    const status = filter ? BOT_STATUS_IN[filter.toLowerCase()] : null;
+    if (filter && !status) return json({ error: 'status must be get, got or watched' }, 400);
+
+    const { results } = status
+      ? await env.DB.prepare('SELECT * FROM movies WHERE status = ? ORDER BY title COLLATE NOCASE').bind(status).all()
+      : await env.DB.prepare('SELECT * FROM movies ORDER BY title COLLATE NOCASE').all();
+    const movies = results.map(botMovie);
+    const counts = { get: 0, got: 0, watched: 0 };
+    for (const m of movies) counts[m.status]++;
+    return json({ count: movies.length, counts: status ? undefined : counts, movies });
+  }
+
+  if (request.method !== 'POST') return json({ error: 'use GET or POST' }, 405);
+
+  const body = await request.json().catch(() => ({}));
+  const { action, imdb_id, title, year } = body;
+  const status = body.status ? BOT_STATUS_IN[String(body.status).toLowerCase()] : null;
+  if (body.status && !status) return json({ error: 'status must be get, got or watched' }, 400);
+  if (!imdb_id && !title) return json({ error: 'title or imdb_id required' }, 400);
+
+  if (action === 'add') {
+    const target = status || 'get';
+    let id = imdb_id;
+    let alternatives = [];
+    if (!id) {
+      const { Search: results = [] } = await searchTitles(String(title), env);
+      if (!results.length) return json({ error: `no film found for "${title}"` }, 404);
+      const pick = pickResult(results, title, year);
+      id = pick.imdbID;
+      alternatives = results
+        .filter((r) => r.imdbID !== id)
+        .slice(0, 4)
+        .map((r) => ({ imdb_id: r.imdbID, title: r.Title, year: r.Year || null }));
+    }
+
+    const existing = await env.DB.prepare('SELECT * FROM movies WHERE imdb_id = ?').bind(id).first();
+    if (existing) {
+      if (existing.status !== target) {
+        await env.DB.prepare('UPDATE movies SET status = ?, watched_at = ? WHERE imdb_id = ?')
+          .bind(target, target === 'archive' ? todayISO() : null, id).run();
+      }
+      const row = await env.DB.prepare('SELECT * FROM movies WHERE imdb_id = ?').bind(id).first();
+      return json({
+        ok: true,
+        result: existing.status === target ? 'already_there' : 'moved',
+        from: BOT_STATUS_OUT[existing.status],
+        movie: botMovie(row),
+        alternatives,
+      });
+    }
+
+    const d = await fetchDetail(id, env);
+    if (d.Response === 'False' || !d.Title) return json({ error: `no details found for ${id}` }, 404);
+    const movie = {
+      imdb_id: d.imdbID,
+      title: d.Title,
+      poster: d.Poster,
+      status: target,
+      year: d.Released && d.Released !== 'N/A' ? d.Released : d.Year,
+      runtime: d.Runtime,
+      rating: d.imdbRating,
+      genre: d.Genre,
+      is_tv_show: d.Type === 'series' ? 1 : 0,
+      watched_at: target === 'archive' ? todayISO() : null,
+    };
+    const cols = Object.keys(movie);
+    await env.DB.prepare(
+      `INSERT INTO movies (${cols.join(', ')}) VALUES (${cols.map(() => '?').join(', ')})`
+    ).bind(...Object.values(movie)).run();
+
+    return json({ ok: true, result: 'added', movie: botMovie(movie), alternatives });
+  }
+
+  if (action === 'move' || action === 'remove') {
+    if (action === 'move' && !status) return json({ error: 'status required: get, got or watched' }, 400);
+    const matches = await findInLibrary(env, { imdb_id, title, year });
+    if (!matches.length) return json({ error: `"${title || imdb_id}" is not in the library` }, 404);
+    if (matches.length > 1) {
+      return json({ error: 'more than one film matches; retry with imdb_id', matches: matches.map(botMovie) }, 409);
+    }
+    const [m] = matches;
+
+    if (action === 'remove') {
+      await env.DB.prepare('DELETE FROM movies WHERE imdb_id = ?').bind(m.imdb_id).run();
+      return json({ ok: true, result: 'removed', movie: botMovie(m) });
+    }
+
+    if (m.status !== status) {
+      await env.DB.prepare('UPDATE movies SET status = ?, watched_at = ? WHERE imdb_id = ?')
+        .bind(status, status === 'archive' ? todayISO() : null, m.imdb_id).run();
+    }
+    return json({
+      ok: true,
+      result: m.status === status ? 'already_there' : 'moved',
+      from: BOT_STATUS_OUT[m.status],
+      movie: m.status === status
+        ? botMovie(m)
+        : botMovie({ ...m, status, watched_at: status === 'archive' ? todayISO() : null }),
+    });
+  }
+
+  return json({ error: 'action must be add, move or remove' }, 400);
+}
+
 export async function onRequest(context) {
   const { request, env } = context;
   const { searchParams } = new URL(request.url);
@@ -197,27 +391,16 @@ export async function onRequest(context) {
   // "matr" or "unner" return nothing. Falls back to OMDB if TMDB is
   // unavailable. The response keeps OMDB's shape either way.
   if (type === 'search') {
-    const q = searchParams.get('q') || '';
-    const tmdbKey = env.TMDB_API_KEY ? normaliseKey(env.TMDB_API_KEY) : '';
-    if (tmdbKey) {
-      try {
-        return json({ Search: await searchTmdb(q, tmdbKey) });
-      } catch (err) {
-        console.log(`TMDB search failed, falling back to OMDB: ${err.message}`);
-      }
-    }
-    const res = await fetch(
-      `https://www.omdbapi.com/?s=${encodeURIComponent(q)}&apikey=${env.OMDB_API_KEY}`
-    );
-    return json(await res.json());
+    return json(await searchTitles(searchParams.get('q') || '', env));
   }
 
   if (type === 'detail') {
-    const res = await fetch(
-      `https://www.omdbapi.com/?i=${encodeURIComponent(searchParams.get('id'))}&apikey=${env.OMDB_API_KEY}&plot=short`
-    );
-    return json(await res.json());
+    return json(await fetchDetail(searchParams.get('id'), env));
   }
+
+  // The bot API carries its own credential, so it is handled before the PIN
+  // gate below.
+  if (type === 'bot') return handleBot(request, env, searchParams);
 
   if (!expectedPin || request.headers.get('x-vault-pin') !== expectedPin) {
     return json({ error: 'unauthorized' }, 401);

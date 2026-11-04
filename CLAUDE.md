@@ -57,7 +57,7 @@ PIN-based (4 separate digit inputs). The PIN lives **server-side only**, as the 
 
 ## API endpoints
 
-All on `/api?type=...`. `auth`, `search`, and `detail` are unauthenticated; everything else requires the `x-vault-pin` header.
+All on `/api?type=...`. `auth`, `search`, and `detail` are unauthenticated; `bot` takes its own bearer token (below); everything else requires the `x-vault-pin` header.
 
 | type | Method | Purpose |
 |---|---|---|
@@ -72,6 +72,17 @@ All on `/api?type=...`. `auth`, `search`, and `detail` are unauthenticated; ever
 
 All SQL uses prepared statements with bound parameters.
 
+### Bot API (`type=bot`)
+
+For Dodo, Daniel's chat bot. Authenticated with `Authorization: Bearer <DODO_API_KEY>` (a Pages secret, never the PIN; unset = 500). Works by title so the bot never needs IMDb ids, and says `watched` where the database says `'archive'`.
+
+- `GET /api?type=bot[&status=get|got|watched]` — the library as compact rows, with per-list counts
+- `POST /api?type=bot` with JSON:
+  - `{"action":"add","title":"Dune","year":2021,"status":"get"}` — searches, picks an exact title (and year) match or the top hit, adds it; if already saved it is moved instead. Returns the film plus `alternatives` so the bot can offer "did you mean…"
+  - `{"action":"move","title":"Dune","status":"got"}` — moves a saved film
+  - `{"action":"remove","title":"Dune"}` — deletes a saved film
+  - `move`/`remove` match the library by exact title, then partial; `imdb_id` works in place of `title`. More than one match returns 409 with `matches`
+
 ## Key Features
 
 - **Design** — "Poster Wall": mobile-first, true black, one colour per list (Got blue, Get violet, Watched green). A floating dock holds the tabs and a separate search button
@@ -83,7 +94,7 @@ All SQL uses prepared statements with bound parameters.
 
 ## Local development
 
-`.dev.vars` holds `OMDB_API_KEY`, `VAULT_PIN` and `TMDB_API_KEY` for local runs. It is gitignored — do not commit it.
+`.dev.vars` holds `OMDB_API_KEY`, `VAULT_PIN`, `TMDB_API_KEY` and `DODO_API_KEY` for local runs. It is gitignored — do not commit it.
 
 ```bash
 npx wrangler pages dev .
@@ -93,6 +104,6 @@ npx wrangler pages dev .
 
 - Local files and the GitHub remote can drift — always check `git fetch && git diff origin/main HEAD` before making changes
 - The app is installed as a PWA on Daniel's phone; cache clears require deleting and re-adding the home screen icon
-- Secrets (`OMDB_API_KEY`, `VAULT_PIN`, `TMDB_API_KEY`) are set in the Cloudflare Pages project settings, not in `wrangler.toml`
+- Secrets (`OMDB_API_KEY`, `VAULT_PIN`, `TMDB_API_KEY`, `DODO_API_KEY`) are set in the Cloudflare Pages project settings, not in `wrangler.toml`
 - Without `TMDB_API_KEY` the `fresh` endpoint returns 503 and the Fresh Finds strip hides itself; the rest of the app is unaffected
 - `wrangler.toml` carries the D1 `database_id`; it is a non-secret identifier and is safe to commit
