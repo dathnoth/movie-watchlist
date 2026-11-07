@@ -2,6 +2,7 @@ let debounceTimer;
 let currentSort = 'title';
 let watchedSort = 'watched';
 let currentView = 'got';
+let gotFilter = '';
 let cachedMovies = [];
 let freshFilms = [];
 let searchHits = [];
@@ -73,10 +74,15 @@ function tileInner({ title, poster, rating, tv, badge }) {
         ${known(rating) ? `<span class="tile-rating">${STAR_SVG}${escapeHtml(rating)}</span>` : ''}`;
 }
 
+// Quality score bands, shared by the poster badge and the Details tab.
+const scoreBand = (n) => (n >= 85 ? 'q-top' : n >= 70 ? 'q-good' : n >= 50 ? 'q-ok' : 'q-low');
+
 function libraryTile(m) {
     const missing = m.status === 'got' && scanMissingIds().has(m.imdb_id);
-    return `<button class="tile" onclick="showDetails('${m.imdb_id}')" aria-label="${escapeHtml(m.title)}${missing ? ', missing from the movies folder' : ''}">
+    const score = m.quality_score ?? null;
+    return `<button class="tile" onclick="showDetails('${m.imdb_id}')" aria-label="${escapeHtml(m.title)}${missing ? ', missing from the movies folder' : ''}${score !== null ? `, quality ${score} out of 100` : ''}">
         ${tileInner({ title: m.title, poster: m.poster, rating: m.rating, tv: m.is_tv_show })}
+        ${score !== null ? `<span class="tile-score ${scoreBand(score)}">${score}</span>` : ''}
         ${missing ? '<span class="tile-missing">Missing</span>' : ''}</button>`;
 }
 
@@ -270,6 +276,7 @@ function sortMovies(movies, sort) {
         if (sort === 'year') return (new Date(b.year).getTime() || 0) - (new Date(a.year).getTime() || 0);
         if (sort === 'rating') return (parseFloat(b.rating) || 0) - (parseFloat(a.rating) || 0);
         if (sort === 'runtime') return (parseInt(b.runtime) || 0) - (parseInt(a.runtime) || 0);
+        if (sort === 'quality') return (b.quality_score ?? -1) - (a.quality_score ?? -1) || a.title.localeCompare(b.title);
         // Most recently watched first; rows with no date sink to the bottom.
         if (sort === 'watched') return (b.watched_at || '').localeCompare(a.watched_at || '') || a.title.localeCompare(b.title);
         return 0;
@@ -293,6 +300,19 @@ function setSort(type, list = 'grid') {
     else currentSort = type;
     document.querySelectorAll(`.sort-container[data-list="${list}"] .sort-btn`)
         .forEach(btn => btn.classList.toggle('active', btn.dataset.sort === type));
+    render(cachedMovies);
+}
+
+// Got-only filters on what's in the file: 4K, Dolby Vision, Atmos (or DTS:X).
+const FILE_FILTERS = {
+    '4k': (f) => f.video?.resolution === '4K',
+    dv: (f) => (f.video?.hdr || []).includes('Dolby Vision'),
+    atmos: (f) => (f.audio || []).some((a) => a.atmos || a.dtsx),
+};
+
+function setGotFilter(type) {
+    gotFilter = gotFilter === type ? '' : type;
+    document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.filter === gotFilter));
     render(cachedMovies);
 }
 
@@ -337,16 +357,20 @@ function render(movies) {
     const buckets = { get: [], got: [], archive: [] };
     movies.forEach(m => (buckets[m.status] || buckets.get).push(m));
     buckets.get = sortMovies(buckets.get, currentSort);
+    const allGot = buckets.got;
     buckets.got = sortMovies(buckets.got, currentSort);
+    if (gotFilter) buckets.got = buckets.got.filter((m) => m.file_info && FILE_FILTERS[gotFilter](m.file_info));
     buckets.archive = sortMovies(buckets.archive, watchedSort);
 
     document.getElementById('gotList').innerHTML = buckets.got.map(libraryTile).join('')
-        || '<p class="empty-state">No movies on the drive yet.</p>';
+        || `<p class="empty-state">${gotFilter ? 'No films on the drive match that.' : 'No movies on the drive yet.'}</p>`;
+    // The file filters only make sense once the drive scan has sent details.
+    document.querySelectorAll('.file-filter').forEach((el) => { el.hidden = !allGot.some((m) => m.file_info); });
     document.getElementById('getList').innerHTML = buckets.get.map(libraryTile).join('')
         || '<p class="empty-state">Nothing to track down yet.</p>';
     document.getElementById('archiveList').innerHTML = watchedListHtml(buckets.archive);
     // Sorting one film (or none) is pointless, so the chips only show for two or more.
-    document.querySelector('#view-got .sort-container').hidden = buckets.got.length < 2;
+    document.querySelector('#view-got .sort-container').hidden = allGot.length < 2;
     document.querySelector('#view-get .sort-container').hidden = buckets.get.length < 2;
     document.querySelector('#view-archive .sort-container').hidden = buckets.archive.length < 2;
 
@@ -360,10 +384,11 @@ function render(movies) {
             <span class="shelf-date">${formatWatchedDate(m.watched_at, { day: 'numeric', month: 'short' })}</span>
         </button>`).join('');
 
-    const missingCount = buckets.got.filter((m) => scanMissingIds().has(m.imdb_id)).length;
+    const missingCount = allGot.filter((m) => scanMissingIds().has(m.imdb_id)).length;
+    const gotCount = gotFilter ? `${buckets.got.length} of ${plural(allGot.length, 'film')}` : plural(allGot.length, 'film');
     document.getElementById('gotSub').textContent = missingCount
-        ? `${plural(buckets.got.length, 'film')} on the drive · ${missingCount} missing from the folder`
-        : `${plural(buckets.got.length, 'film')} on the drive`;
+        ? `${gotCount} on the drive · ${missingCount} missing from the folder`
+        : `${gotCount} on the drive`;
     syncScanAlert();
     document.getElementById('getSub').textContent = `${plural(buckets.get.length, 'film')} to track down`;
     document.getElementById('archiveSub').textContent = `${plural(buckets.archive.length, 'film')} seen`;
@@ -490,6 +515,8 @@ async function showDetails(id) {
     detailCache[id] = d;
 
     const local = cachedMovies.find(m => m.imdb_id === id);
+    // What's in the file on the drive, from Dodo's scan. Only films on the drive have it.
+    const file = local?.status === 'got' && local.file_info?.score ? local.file_info : null;
     const ytUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(d.Title + ' trailer')}`;
     // GET is the "still need a copy" list, so the torrent search lives there.
     const torrentUrl = local?.status === 'get'
@@ -507,19 +534,76 @@ async function showDetails(id) {
                 <h2 class="detail-title">${escapeHtml(omdbText(d.Title))}${d.Type === 'series' ? ' <span class="tv-badge-inline">TV</span>' : ''}</h2>
                 <div class="detail-meta">
                     ${known(d.imdbRating) ? `<span class="imdb-chip">IMDb</span><b>${escapeHtml(d.imdbRating)}</b>` : ''}
+                    ${file ? `<span class="quality-chip ${scoreBand(file.score.total)}">${file.score.total}<small>/100</small></span>` : ''}
                     <span>${meta}</span>
                 </div>
-                ${omdbText(d.Plot) ? `<p class="detail-plot">${escapeHtml(omdbText(d.Plot))}</p>` : ''}
-                <dl class="detail-credits">${credit('Director', d.Director)}${credit('Cast', d.Actors)}</dl>
-                <div class="detail-links">
-                    <a href="${ytUrl}" target="_blank" rel="noopener" class="pill">${ICONS.play}Trailer</a>
-                    <a href="https://www.imdb.com/title/${id}/" target="_blank" rel="noopener" class="pill">${ICONS.ext}IMDb</a>
-                    ${torrentUrl ? `<a href="${torrentUrl}" target="_blank" rel="noopener" class="pill">${ICONS.download}Torrent</a>` : ''}
-                    ${local ? `<button class="pill pill-danger" onclick="removeFromModal('${id}')">Remove</button>` : ''}
+                ${file ? `<div class="detail-tabs" role="tablist">
+                    <button class="detail-tab active" role="tab" data-tab="overview" onclick="showDetailTab('overview')">Overview</button>
+                    <button class="detail-tab" role="tab" data-tab="file" onclick="showDetailTab('file')">Details</button>
+                </div>` : ''}
+                <div class="detail-panel" data-panel="overview">
+                    ${omdbText(d.Plot) ? `<p class="detail-plot">${escapeHtml(omdbText(d.Plot))}</p>` : ''}
+                    <dl class="detail-credits">${credit('Director', d.Director)}${credit('Cast', d.Actors)}</dl>
+                    <div class="detail-links">
+                        <a href="${ytUrl}" target="_blank" rel="noopener" class="pill">${ICONS.play}Trailer</a>
+                        <a href="https://www.imdb.com/title/${id}/" target="_blank" rel="noopener" class="pill">${ICONS.ext}IMDb</a>
+                        ${torrentUrl ? `<a href="${torrentUrl}" target="_blank" rel="noopener" class="pill">${ICONS.download}Torrent</a>` : ''}
+                        ${local ? `<button class="pill pill-danger" onclick="removeFromModal('${id}')">Remove</button>` : ''}
+                    </div>
                 </div>
+                ${file ? `<div class="detail-panel" data-panel="file" hidden>${fileDetailsHtml(file)}</div>` : ''}
             </div>
             <div class="picker" id="picker">${pickerHtml(id, local?.status)}</div>
         </div>`;
+}
+
+function showDetailTab(tab) {
+    document.querySelectorAll('.detail-tab').forEach((b) => b.classList.toggle('active', b.dataset.tab === tab));
+    document.querySelectorAll('.detail-panel').forEach((p) => { p.hidden = p.dataset.panel !== tab; });
+}
+
+const LANGUAGE_NAMES = typeof Intl.DisplayNames === 'function' ? new Intl.DisplayNames(['en'], { type: 'language' }) : null;
+function languageName(code) {
+    if (!code || code === '?') return 'Unknown';
+    try { return LANGUAGE_NAMES?.of(code) || code; } catch { return code; }
+}
+
+// The Details tab: the score and how it was reached, then the picture, the
+// sound tracks (best first), subtitles and the file itself.
+function fileDetailsHtml(f) {
+    const v = f.video || {};
+    const row = (label, value) => value ? `<div><dt>${label}</dt><dd>${escapeHtml(String(value))}</dd></div>` : '';
+    const parts = f.score.parts.map((p) => `
+        <li class="score-part">
+            <span class="score-part-label">${escapeHtml(p.label)}<small>${escapeHtml(p.note)}</small></span>
+            <span class="score-part-pts">${p.got}<small>/${p.max}</small></span>
+            <span class="score-bar"><i style="width:${Math.round((p.got / p.max) * 100)}%"></i></span>
+        </li>`).join('');
+    const hdr = (v.hdr || []).map((h) => h === 'Dolby Vision' && v.dv_profile ? `Dolby Vision (profile ${v.dv_profile})` : h).join(' · ') || 'None (SDR)';
+    const tracks = (f.audio || []).map((a) => `<li>${escapeHtml(`${a.codec}${a.atmos ? ' Atmos' : a.dtsx ? ' DTS:X' : ''} ${a.channels}`)}
+        <small>${escapeHtml(languageName(a.language))}${a.lossless ? ' · lossless' : ''}</small></li>`).join('');
+    const subs = (f.subtitles || []).map(languageName);
+    const gb = f.size ? `${(f.size / 1e9).toFixed(1)} GB` : '';
+    return `
+        <div class="score-head">
+            <span class="score-big ${scoreBand(f.score.total)}">${f.score.total}<small>/100</small></span>
+            <span class="score-sum">${escapeHtml(f.summary || '')}<small>Picture ${f.score.video}/60 · Sound ${f.score.audio}/40</small></span>
+        </div>
+        <ul class="score-parts">${parts}</ul>
+        <h3 class="file-head">Picture</h3>
+        <dl class="detail-credits file-facts">
+            ${row('Resolution', v.width ? `${v.resolution} · ${v.width}×${v.height}` : v.resolution)}
+            ${row('HDR', hdr)}
+            ${row('Video', [v.codec, v.bit_depth ? `${v.bit_depth}-bit` : '', v.bitrate_mbps ? `${v.bitrate_mbps} Mbps` : '', v.fps ? `${v.fps} fps` : ''].filter(Boolean).join(' · '))}
+        </dl>
+        <h3 class="file-head">Sound</h3>
+        <ul class="file-tracks">${tracks || '<li>No sound tracks</li>'}</ul>
+        ${subs.length ? `<h3 class="file-head">Subtitles</h3><p class="file-subs">${escapeHtml(subs.join(', '))}</p>` : ''}
+        <h3 class="file-head">File</h3>
+        <dl class="detail-credits file-facts">
+            ${row('Name', f.file)}
+            ${row('Size', [gb, f.minutes ? `${f.minutes} min` : ''].filter(Boolean).join(' · '))}
+        </dl>`;
 }
 
 function closeModal() {

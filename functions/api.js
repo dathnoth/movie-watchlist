@@ -220,7 +220,57 @@ function botMovie(m) {
     genre: m.genre && m.genre !== 'N/A' ? m.genre : null,
     is_tv_show: !!m.is_tv_show,
     watched_at: m.watched_at || null,
+    quality: m.quality_score ?? null,
+    file: parseFileInfo(m.file_info)?.summary || null,
   };
+}
+
+function parseFileInfo(raw) {
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+// Adds the file details columns (migration 0004) if the database doesn't have
+// them yet, and records the migration so `wrangler d1 migrations apply` skips
+// it. This lets the drive scan start without a manual migration. Checked once
+// per isolate.
+let fileColumnsReady = false;
+async function ensureFileColumns(env) {
+  if (fileColumnsReady) return;
+  const { results } = await env.DB.prepare('PRAGMA table_info(movies)').all();
+  if (!results.some((c) => c.name === 'file_info')) {
+    await env.DB.batch([
+      env.DB.prepare('ALTER TABLE movies ADD COLUMN file_info TEXT'),
+      env.DB.prepare('ALTER TABLE movies ADD COLUMN quality_score INTEGER'),
+    ]);
+    const tracked = await env.DB.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'd1_migrations'").first();
+    if (tracked) await env.DB.prepare('INSERT OR IGNORE INTO d1_migrations (name) VALUES (?)').bind('0004_file_details.sql').run();
+  }
+  fileColumnsReady = true;
+}
+
+// File details from Dodo's scan of the drive: one entry per film file, keyed
+// by imdb_id. With `replace`, films missing from the list lose their details
+// (the file has left the drive). One batch, so it applies all or nothing.
+async function saveFileDetails(env, files, replace) {
+  if (!Array.isArray(files) || files.length > 2000) return json({ error: 'files must be an array' }, 400);
+  const valid = files.filter((f) => /^tt\d+$/.test(f?.imdb_id || '')
+    && Number.isInteger(f.score) && f.score >= 0 && f.score <= 100
+    && f.info && typeof f.info === 'object');
+  if (valid.length !== files.length) return json({ error: 'each file needs imdb_id, score (0–100) and info' }, 400);
+  await ensureFileColumns(env);
+
+  const update = env.DB.prepare('UPDATE movies SET file_info = ?, quality_score = ? WHERE imdb_id = ?');
+  const statements = valid.map((f) => update.bind(JSON.stringify(f.info).slice(0, 20000), f.score, f.imdb_id));
+  if (replace) statements.unshift(env.DB.prepare('UPDATE movies SET file_info = NULL, quality_score = NULL WHERE file_info IS NOT NULL'));
+  const results = statements.length ? await env.DB.batch(statements) : [];
+  const updates = replace ? results.slice(1) : results;
+  const unknown = valid.filter((_, i) => !updates[i]?.meta?.changes).map((f) => f.imdb_id);
+  return json({ ok: true, updated: valid.length - unknown.length, unknown });
 }
 
 // Finds a film already in the library: by imdb_id, else an exact title
@@ -281,6 +331,7 @@ async function handleBot(request, env, searchParams) {
 
   const body = await request.json().catch(() => ({}));
   const { action, imdb_id, title, year } = body;
+  if (action === 'files') return saveFileDetails(env, body.files, !!body.replace);
   const status = body.status ? BOT_STATUS_IN[String(body.status).toLowerCase()] : null;
   if (body.status && !status) return json({ error: 'status must be get, got or watched' }, 400);
   if (!imdb_id && !title) return json({ error: 'title or imdb_id required' }, 400);
@@ -366,7 +417,7 @@ async function handleBot(request, env, searchParams) {
     });
   }
 
-  return json({ error: 'action must be add, move or remove' }, 400);
+  return json({ error: 'action must be add, move, remove or files' }, 400);
 }
 
 export async function onRequest(context) {
@@ -410,7 +461,7 @@ export async function onRequest(context) {
     const { results } = await env.DB.prepare(
       'SELECT * FROM movies ORDER BY title COLLATE NOCASE'
     ).all();
-    return json(results.map((m) => ({ ...m, is_tv_show: !!m.is_tv_show })));
+    return json(results.map((m) => ({ ...m, is_tv_show: !!m.is_tv_show, file_info: parseFileInfo(m.file_info) })));
   }
 
   if (type === 'fresh') {

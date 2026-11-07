@@ -44,6 +44,11 @@
                     <button class="chip sort-btn" data-sort="year" onclick="setSort('year')">Released</button>
                     <button class="chip sort-btn" data-sort="rating" onclick="setSort('rating')">Rating</button>
                     <button class="chip sort-btn" data-sort="runtime" onclick="setSort('runtime')">Runtime</button>
+                    <button class="chip sort-btn file-filter" data-sort="quality" onclick="setSort('quality')" hidden>Quality</button>
+                    <span class="chip-divider file-filter" hidden></span>
+                    <button class="chip filter-btn file-filter" data-filter="4k" onclick="setGotFilter('4k')" hidden>4K</button>
+                    <button class="chip filter-btn file-filter" data-filter="dv" onclick="setGotFilter('dv')" hidden>Dolby Vision</button>
+                    <button class="chip filter-btn file-filter" data-filter="atmos" onclick="setGotFilter('atmos')" hidden>Atmos</button>
                 </div>
                 <div id="gotList" class="poster-wall"></div>
             </section>

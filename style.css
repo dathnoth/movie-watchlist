@@ -115,6 +115,7 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round
     -webkit-appearance: none; appearance: none;
 }
 .chip.active { background: var(--text); color: #000; border-color: var(--text); }
+.chip-divider { flex: none; width: 1px; margin: 8px 2px; background: var(--line); }
 
 /* Selects drawn as chips, with a chevron for the caret. */
 .chip-select {
@@ -160,6 +161,15 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round
     font-size: 10px; font-weight: 800; letter-spacing: 0.4px; text-transform: uppercase;
 }
 .tile-tv { background: rgba(0, 0, 0, 0.62); color: #fff; }
+/* Quality score out of 100, from the file on the drive. */
+.tile-score {
+    position: absolute; right: 6px; bottom: 6px; padding: 3px 6px; border-radius: 6px;
+    background: rgba(0, 0, 0, 0.62); font-size: 11px; font-weight: 800; color: var(--q);
+}
+.q-top { --q: var(--seen); }
+.q-good { --q: var(--got); }
+.q-ok { --q: #ffb020; }
+.q-low { --q: var(--dim); }
 /* A TV series that's also owned stacks its status badge under the TV one. */
 .tile-tv + .tile-owned { top: 28px; }
 
@@ -416,6 +426,35 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round
 .detail-credits dt { font-size: 11px; font-weight: 700; color: var(--dim); text-transform: uppercase; letter-spacing: 0.6px; }
 .detail-credits dd { margin: 1px 0 0; font-size: 14px; color: #d1d1d6; }
 .detail-links { display: flex; flex-wrap: wrap; gap: 8px; }
+.quality-chip { font-weight: 800; color: var(--q); }
+.quality-chip small { font-weight: 600; color: var(--dim); }
+
+/* Overview / Details tabs; Details shows what's in the file on the drive. */
+.detail-tabs { display: flex; gap: 6px; margin: 0 0 16px; padding: 4px; border-radius: 99px; background: var(--glass); border: 1px solid var(--line); }
+.detail-tab {
+    flex: 1; height: 34px; border: 0; border-radius: 99px; background: transparent; cursor: pointer;
+    color: #c7c7cc; font-size: 13.5px; font-weight: 700;
+}
+.detail-tab.active { background: var(--text); color: #000; }
+.score-head { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; }
+.score-big { font-size: 44px; font-weight: 800; letter-spacing: -1.5px; line-height: 1; color: var(--q); }
+.score-big small { font-size: 15px; letter-spacing: 0; color: var(--dim); }
+.score-sum { display: grid; gap: 3px; font-size: 14px; font-weight: 600; color: var(--text); }
+.score-sum small { font-size: 12px; font-weight: 500; color: var(--dim); }
+.score-parts { list-style: none; margin: 0 0 20px; padding: 0; display: grid; gap: 10px; }
+.score-part { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; align-items: end; }
+.score-part-label { display: grid; font-size: 13px; font-weight: 600; color: #d1d1d6; }
+.score-part-label small, .file-tracks small { font-size: 11.5px; font-weight: 500; color: var(--dim); }
+.score-part-pts { font-size: 13px; font-weight: 700; }
+.score-part-pts small { color: var(--dim); font-weight: 500; }
+.score-bar { grid-column: 1 / -1; height: 4px; border-radius: 2px; background: var(--surface-2); overflow: hidden; }
+.score-bar i { display: block; height: 100%; border-radius: 2px; background: var(--text); }
+.file-head { margin: 0 0 8px; font-size: 11px; font-weight: 700; color: var(--dim); text-transform: uppercase; letter-spacing: 0.6px; }
+.file-facts { margin-bottom: 18px; }
+.file-facts dd { word-break: break-word; }
+.file-tracks { list-style: none; margin: 0 0 18px; padding: 0; display: grid; gap: 8px; font-size: 14px; color: #d1d1d6; }
+.file-tracks li { display: grid; gap: 1px; }
+.file-subs { margin: 0 0 18px; font-size: 14px; line-height: 1.45; color: #d1d1d6; }
 .pill {
     display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 15px;
     border-radius: 99px; background: var(--glass); border: 1px solid var(--line);

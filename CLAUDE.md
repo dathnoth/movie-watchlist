@@ -27,6 +27,8 @@ Two tables. `movies` is the library — schema in `migrations/0001_init.sql`, wi
 | `votes`, `my_stars` | INTEGER | |
 | `is_tv_show` | INTEGER | 0/1, coerced to boolean in the API response |
 | `watched_at` | TEXT | `YYYY-MM-DD`, set when status → `'archive'` (or a movie is added straight to it), cleared otherwise |
+| `file_info` | TEXT | JSON from Dodo's scan of the film file on the drive: `video` (resolution, `hdr` list, codec, bitrate), `audio` tracks best first (codec, channels, `atmos`, `dtsx`, `lossless`, language), `subtitles`, `size`, `minutes`, `summary` and `score` (`total`, `video`/60, `audio`/40, `parts` with label/got/max/note). Parsed to an object by `list`. Migration `0004_file_details.sql`, which the API also applies itself on the first `files` call (and records in `d1_migrations`) |
+| `quality_score` | INTEGER | `score.total` (0–100) on its own, for sorting |
 
 Apply migrations with:
 
@@ -82,6 +84,8 @@ For Dodo, Daniel's chat bot. Authenticated with `Authorization: Bearer <DODO_API
   - `{"action":"move","title":"Dune","status":"got"}` — moves a saved film
   - `{"action":"remove","title":"Dune"}` — deletes a saved film
   - `move`/`remove` match the library by exact title, then partial; `imdb_id` works in place of `title`. More than one match returns 409 with `matches`
+  - `{"action":"files","files":[{"imdb_id","info","score"}],"replace":true}` — file details from Dodo's drive scan (`server/mediainfo.ts` in Dodo, run on the host Mac). `replace` clears films no longer in the list. Returns `updated` and `unknown` (ids not in the library)
+- Bot rows include `quality` and `file` (the one-line summary)
 
 ## Key Features
 
@@ -90,6 +94,7 @@ For Dodo, Daniel's chat bot. Authenticated with `Authorization: Bearer <DODO_API
 - **Poster wall** — GOT and GET are tight poster grids with rounded corners (3 across on a phone) with the rating on each poster
 - **Sorting** — title / release date / rating / runtime chips, shared by the poster walls; WATCHED has its own sort, defaulting to most recently watched (grouped by month)
 - **Watched** — a "Recently" shelf of the latest posters, then list rows: thumbnail, title, watched date, year, rating
+- **File quality** — Got posters show the quality score (0–100) bottom right. The detail screen gets Overview / Details tabs when the film has file details: Details shows the score breakdown, picture, sound tracks, subtitles and file. Got also has a Quality sort and 4K / Dolby Vision / Atmos filters, shown once any film has details
 - **Search** — full-screen sheet; TMDB via the Function proxy, debounced 300ms; results already in the library are badged with their status
 
 ## Local development
