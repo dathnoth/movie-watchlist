@@ -331,7 +331,6 @@ async function handleBot(request, env, searchParams) {
 
   const body = await request.json().catch(() => ({}));
   const { action, imdb_id, title, year } = body;
-  if (action === 'files') return saveFileDetails(env, body.files, !!body.replace);
   const status = body.status ? BOT_STATUS_IN[String(body.status).toLowerCase()] : null;
   if (body.status && !status) return json({ error: 'status must be get, got or watched' }, 400);
   if (!imdb_id && !title) return json({ error: 'title or imdb_id required' }, 400);
@@ -417,7 +416,7 @@ async function handleBot(request, env, searchParams) {
     });
   }
 
-  return json({ error: 'action must be add, move, remove or files' }, 400);
+  return json({ error: 'action must be add, move or remove' }, 400);
 }
 
 export async function onRequest(context) {
@@ -509,6 +508,13 @@ export async function onRequest(context) {
       .run();
 
     return json({ ok: true });
+  }
+
+  // From Dodo's drive scan on the host Mac, which reads the library with the
+  // same PIN.
+  if (type === 'files' && request.method === 'POST') {
+    const body = await request.json().catch(() => ({}));
+    return saveFileDetails(env, body.files, !!body.replace);
   }
 
   if (type === 'delete' && request.method === 'POST') {

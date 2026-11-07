@@ -27,7 +27,7 @@ Two tables. `movies` is the library — schema in `migrations/0001_init.sql`, wi
 | `votes`, `my_stars` | INTEGER | |
 | `is_tv_show` | INTEGER | 0/1, coerced to boolean in the API response |
 | `watched_at` | TEXT | `YYYY-MM-DD`, set when status → `'archive'` (or a movie is added straight to it), cleared otherwise |
-| `file_info` | TEXT | JSON from Dodo's scan of the film file on the drive: `video` (resolution, `hdr` list, codec, bitrate), `audio` tracks best first (codec, channels, `atmos`, `dtsx`, `lossless`, language), `subtitles`, `size`, `minutes`, `summary` and `score` (`total`, `video`/60, `audio`/40, `parts` with label/got/max/note). Parsed to an object by `list`. Migration `0004_file_details.sql`, which the API also applies itself on the first `files` call (and records in `d1_migrations`) |
+| `file_info` | TEXT | JSON from Dodo's scan of the film file on the drive: `video` (resolution, `hdr` list, codec, bitrate), `audio` tracks best first (codec, channels, `atmos`, `dtsx`, `lossless`, language), `subtitles`, `size`, `minutes`, `summary` and `score` (`total`, `video`/60, `audio`/40, `parts` with label/got/max/note). Parsed to an object by `list`. Migration `0004_file_details.sql`, which the API also applies itself on the first `files` request (and records in `d1_migrations`) |
 | `quality_score` | INTEGER | `score.total` (0–100) on its own, for sorting |
 
 Apply migrations with:
@@ -70,6 +70,7 @@ All on `/api?type=...`. `auth`, `search`, and `detail` are unauthenticated; `bot
 | `upsert` | POST | Insert movie, or refresh metadata if it exists (never overwrites `status`) |
 | `status` | POST | Change status; manages `watched_at` |
 | `delete` | POST | Remove by `imdb_id` |
+| `files` | POST | `{"files":[{"imdb_id","info","score"}],"replace":true}` — file details from Dodo's drive scan (`server/mediainfo.ts` in Dodo, on the host Mac, using the PIN like its reads). `replace` clears films no longer in the list. Returns `updated` and `unknown` (ids not in the library) |
 | `fresh` | GET | Recent digitally-released films from TMDB, minus anything already in the library |
 
 All SQL uses prepared statements with bound parameters.
@@ -84,7 +85,6 @@ For Dodo, Daniel's chat bot. Authenticated with `Authorization: Bearer <DODO_API
   - `{"action":"move","title":"Dune","status":"got"}` — moves a saved film
   - `{"action":"remove","title":"Dune"}` — deletes a saved film
   - `move`/`remove` match the library by exact title, then partial; `imdb_id` works in place of `title`. More than one match returns 409 with `matches`
-  - `{"action":"files","files":[{"imdb_id","info","score"}],"replace":true}` — file details from Dodo's drive scan (`server/mediainfo.ts` in Dodo, run on the host Mac). `replace` clears films no longer in the list. Returns `updated` and `unknown` (ids not in the library)
 - Bot rows include `quality` and `file` (the one-line summary)
 
 ## Key Features
