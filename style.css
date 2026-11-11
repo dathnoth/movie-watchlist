@@ -509,6 +509,10 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round
 
 #authOverlay { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; }
 .auth-card { max-width: 350px; margin: 0 auto; text-align: center; }
+.auth-ticket {
+    display: block; width: 164px; height: auto; margin: 0 auto 18px;
+    filter: drop-shadow(0 10px 36px rgba(167, 139, 250, 0.35));
+}
 .wordmark { font-size: 1.8rem; font-weight: 900; margin: 0 0 6px; letter-spacing: -1px; }
 .wordmark span { color: var(--got); }
 .auth-sub { font-size: 0.8rem; color: var(--dim); margin: 0 0 24px; }

@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="100 215 824 610">
+<defs>
+  <radialGradient id="bg" cx="50%" cy="28%" r="85%">
+    <stop offset="0" stop-color="#1d1d26"/><stop offset=".55" stop-color="#08080b"/><stop offset="1" stop-color="#000"/>
+  </radialGradient>
+  <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%">
+    <feGaussianBlur in="SourceAlpha" stdDeviation="22"/><feOffset dy="18"/>
+    <feComponentTransfer><feFuncA type="linear" slope=".65"/></feComponentTransfer>
+    <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+  </filter>
+  <filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="60"/></filter>
+  <linearGradient id="gloss" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#fff" stop-opacity=".28"/><stop offset=".45" stop-color="#fff" stop-opacity="0"/>
+  </linearGradient><linearGradient id="tg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#b9a5ff"/><stop offset="1" stop-color="#3a8eff"/></linearGradient><mask id="tm"><rect width="1024" height="1024" fill="#fff"/>
+     <circle cx="672" cy="340" r="36" fill="#000"/><circle cx="672" cy="684" r="36" fill="#000"/>
+     <circle cx="192" cy="512" r="40" fill="#000"/><circle cx="832" cy="512" r="40" fill="#000"/><circle cx="672" cy="372" r="7" fill="#000"/><circle cx="672" cy="407" r="7" fill="#000"/><circle cx="672" cy="442" r="7" fill="#000"/><circle cx="672" cy="477" r="7" fill="#000"/><circle cx="672" cy="512" r="7" fill="#000"/><circle cx="672" cy="547" r="7" fill="#000"/><circle cx="672" cy="582" r="7" fill="#000"/><circle cx="672" cy="617" r="7" fill="#000"/><circle cx="672" cy="652" r="7" fill="#000"/></mask></defs><g transform="rotate(-12 512 512)">
+     
+     <g filter="url(#shadow)" mask="url(#tm)">
+       <rect x="192" y="340" width="640" height="344" rx="44" fill="url(#tg)"/>
+       <rect x="192" y="340" width="640" height="344" rx="44" fill="url(#gloss)"/>
+     </g>
+     <rect x="282" y="430" width="300" height="34" rx="17" fill="#fff" opacity=".95"/>
+     <rect x="282" y="495" width="220" height="26" rx="13" fill="#fff" opacity=".55"/>
+     <rect x="282" y="550" width="160" height="26" rx="13" fill="#fff" opacity=".55"/>
+     <path d="M752.0 450.0L767.9 490.2L811.0 492.8L777.7 520.3L788.4 562.2L752.0 539.0L715.6 562.2L726.3 520.3L693.0 492.8L736.1 490.2Z" fill="#ffd60a" stroke="#ffd60a" stroke-width="14" stroke-linejoin="round"/>
+   </g></svg>
