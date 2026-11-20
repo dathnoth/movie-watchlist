@@ -8,6 +8,8 @@ let freshFilms = [];
 let searchHits = [];
 let scanReport = null;
 let scanReady = false;
+// Removals still inside their Undo window; kept out of library refreshes.
+const pendingDeletes = new Set();
 // OMDB detail fetched for the open modal, reused when adding so it isn't fetched twice.
 const detailCache = {};
 
@@ -34,26 +36,91 @@ async function api(type, options = {}) {
         method: options.body ? 'POST' : 'GET',
         headers: { 'x-vault-pin': getPin(), 'Content-Type': 'application/json' },
         body: options.body ? JSON.stringify(options.body) : undefined,
+        // Lets a pending delete still reach the server as the app is closed.
+        keepalive: Boolean(options.keepalive),
     });
     if (res.status === 401) { logout(); throw new Error('unauthorized'); }
-    return res.json();
+    const data = await res.json();
+    if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
+    return data;
 }
 
 function logout() {
     localStorage.removeItem('vault_pin');
+    localStorage.removeItem(LIBRARY_KEY);
     document.getElementById('authOverlay').style.display = 'flex';
     document.getElementById('mainApp').style.display = 'none';
+}
+
+// The last library seen, so the walls are there the moment the app opens and
+// the network only has to catch up.
+const LIBRARY_KEY = 'vault_library';
+function readCachedLibrary() {
+    try {
+        const data = JSON.parse(localStorage.getItem(LIBRARY_KEY) || 'null');
+        return Array.isArray(data) ? data : null;
+    } catch {
+        return null;
+    }
+}
+function saveLibrary() {
+    try { localStorage.setItem(LIBRARY_KEY, JSON.stringify(cachedMovies)); } catch { /* full: skip */ }
+}
+
+// Tab, sorts and filter come back as you left them.
+const PREFS_KEY = 'vault_prefs';
+function savePrefs() {
+    localStorage.setItem(PREFS_KEY, JSON.stringify({ view: currentView, sort: currentSort, watchedSort, gotFilter }));
+}
+function restorePrefs() {
+    let p = {};
+    try { p = JSON.parse(localStorage.getItem(PREFS_KEY) || '{}') || {}; } catch { /* defaults */ }
+    if (['got', 'get', 'archive'].includes(p.view)) currentView = p.view;
+    if (['title', 'year', 'rating', 'runtime', 'quality'].includes(p.sort)) currentSort = p.sort;
+    if (['watched', 'title', 'year', 'rating', 'runtime'].includes(p.watchedSort)) watchedSort = p.watchedSort;
+    if (p.gotFilter in FILE_FILTERS) gotFilter = p.gotFilter;
+    syncControls();
+}
+function syncControls() {
+    document.querySelectorAll('.view-tab').forEach(t => t.classList.toggle('active', t.dataset.view === currentView));
+    document.querySelectorAll('.view-panel').forEach(p => p.classList.toggle('active', p.id === `view-${currentView}`));
+    document.querySelectorAll('.sort-container[data-list="grid"] .sort-btn').forEach(b => b.classList.toggle('active', b.dataset.sort === currentSort));
+    document.querySelectorAll('.sort-container[data-list="watched"] .sort-btn').forEach(b => b.classList.toggle('active', b.dataset.sort === watchedSort));
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.toggle('active', b.dataset.filter === gotFilter));
+}
+
+function enterApp() {
+    document.getElementById('authOverlay').style.display = 'none';
+    document.getElementById('mainApp').style.display = 'block';
+    restorePrefs();
+    const cached = readCachedLibrary();
+    if (cached) {
+        cachedMovies = cached;
+        render(cached);
+    } else {
+        ['gotList', 'getList'].forEach((id) => { document.getElementById(id).innerHTML = SKELETON_TILES; });
+    }
+    fetchMovies();
 }
 
 // The stored PIN persists until the server rejects it (see logout()), so the
 // installed PWA doesn't re-prompt on every launch.
 window.onload = () => {
-    if (getPin()) {
-        document.getElementById('authOverlay').style.display = 'none';
-        document.getElementById('mainApp').style.display = 'block';
-        fetchMovies();
-    }
+    if (getPin()) enterApp();
 };
+
+// OMDB (Amazon) and TMDB posters are both resizable by URL. The stored ones
+// are ~300px wide, soft on a phone screen and blurry on the detail hero.
+function posterAt(url, size = 'tile') {
+    if (!url) return url;
+    const amazon = size === 'hero' ? 'SX1000' : 'SX500';
+    const tmdb = size === 'hero' ? 'w780' : 'w342';
+    return url
+        .replace(/\._V1_[^/]*\.jpg$/, `._V1_${amazon}.jpg`)
+        .replace(/\/t\/p\/w\d+\//, `/t/p/${tmdb}/`);
+}
+
+const todayISO = () => new Date().toLocaleDateString('en-CA');
 
 // OMDB reports missing fields as the string "N/A".
 const known = (v) => (v && v !== 'N/A' ? v : '');
@@ -66,7 +133,7 @@ const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 // dead poster still shows what the film is.
 function tileInner({ title, poster, rating, tv, badge }) {
     const img = known(poster)
-        ? `<img src="${escapeHtml(poster)}" alt="" loading="lazy" onload="this.classList.add('loaded')" onerror="this.remove()">`
+        ? `<img src="${escapeHtml(posterAt(poster))}" alt="" loading="lazy" decoding="async" onload="this.classList.add('loaded')" onerror="this.remove()">`
         : '';
     return `<span class="tile-fallback">${escapeHtml(title)}</span>${img}
         ${tv ? '<span class="tile-tv">TV</span>' : ''}
@@ -111,6 +178,21 @@ document.getElementById('clearSearch').addEventListener('click', () => {
     input.value = '';
     input.dispatchEvent(new Event('input'));
     input.focus();
+});
+
+// Return closes the keyboard so the results underneath can be seen.
+document.getElementById('movieInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') e.target.blur();
+});
+
+// On a keyboard, / opens search from anywhere.
+document.addEventListener('keydown', (e) => {
+    if (e.key !== '/' || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (e.target.closest('input, select, textarea')) return;
+    if (!getPin() || document.body.classList.contains('modal-open')) return;
+    e.preventDefault();
+    if (!document.body.classList.contains('search-open')) toggleSearch();
+    else document.getElementById('movieInput').focus();
 });
 
 function setSearchHint(text) {
@@ -259,11 +341,13 @@ function resetFreshFilters() {
 async function fetchMovies() {
     const data = await api('list');
     if (!Array.isArray(data)) return;
-    cachedMovies = data;
+    // A removal still inside its undo window stays hidden.
+    cachedMovies = data.filter((m) => !pendingDeletes.has(m.imdb_id));
+    saveLibrary();
     scanReady = true;
     const scanBtn = document.getElementById('scanBtn');
     if (scanBtn && !scanBtn.hidden) scanBtn.disabled = false;
-    render(data);
+    render(cachedMovies);
     // Owned badges on open search results follow the library.
     if (searchHits.length) renderSearch();
     // Re-run after each library change so anything just added drops out.
@@ -284,9 +368,15 @@ function sortMovies(movies, sort) {
 }
 
 function setView(view) {
+    const overlay = document.body.classList.contains('search-open') || document.body.classList.contains('scan-open');
+    // Tapping the tab you're already on scrolls back to the top.
+    if (view === currentView && !overlay) {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+    }
     currentView = view;
-    document.querySelectorAll('.view-tab').forEach(t => t.classList.toggle('active', t.dataset.view === view));
-    document.querySelectorAll('.view-panel').forEach(p => p.classList.toggle('active', p.id === `view-${view}`));
+    syncControls();
+    savePrefs();
     if (document.body.classList.contains('search-open')) toggleSearch();
     if (document.body.classList.contains('scan-open')) closeScan();
     updateBackdrop();
@@ -298,8 +388,8 @@ function setView(view) {
 function setSort(type, list = 'grid') {
     if (list === 'watched') watchedSort = type;
     else currentSort = type;
-    document.querySelectorAll(`.sort-container[data-list="${list}"] .sort-btn`)
-        .forEach(btn => btn.classList.toggle('active', btn.dataset.sort === type));
+    syncControls();
+    savePrefs();
     render(cachedMovies);
 }
 
@@ -312,7 +402,8 @@ const FILE_FILTERS = {
 
 function setGotFilter(type) {
     gotFilter = gotFilter === type ? '' : type;
-    document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.filter === gotFilter));
+    syncControls();
+    savePrefs();
     render(cachedMovies);
 }
 
@@ -328,7 +419,7 @@ function watchedRowHtml(m) {
     ].filter(Boolean).join(' · ');
     return `
         <button class="watched-row" onclick="showDetails('${m.imdb_id}')">
-            <span class="watched-thumb">${known(m.poster) ? `<img src="${escapeHtml(m.poster)}" alt="" loading="lazy" onerror="this.remove()">` : ''}</span>
+            <span class="watched-thumb">${known(m.poster) ? `<img src="${escapeHtml(posterAt(m.poster))}" alt="" loading="lazy" onerror="this.remove()">` : ''}</span>
             <span class="watched-main">
                 <span class="watched-title">${escapeHtml(m.title)}${m.is_tv_show ? ' <span class="tv-badge-inline">TV</span>' : ''}</span>
                 <span class="watched-meta">${meta}</span>
@@ -358,14 +449,15 @@ function render(movies) {
     movies.forEach(m => (buckets[m.status] || buckets.get).push(m));
     buckets.get = sortMovies(buckets.get, currentSort);
     const allGot = buckets.got;
+    const hasFileInfo = allGot.some((m) => m.file_info);
     buckets.got = sortMovies(buckets.got, currentSort);
-    if (gotFilter) buckets.got = buckets.got.filter((m) => m.file_info && FILE_FILTERS[gotFilter](m.file_info));
+    if (gotFilter && hasFileInfo) buckets.got = buckets.got.filter((m) => m.file_info && FILE_FILTERS[gotFilter](m.file_info));
     buckets.archive = sortMovies(buckets.archive, watchedSort);
 
     document.getElementById('gotList').innerHTML = buckets.got.map(libraryTile).join('')
-        || `<p class="empty-state">${gotFilter ? 'No films on the drive match that.' : 'No movies on the drive yet.'}</p>`;
+        || `<p class="empty-state">${gotFilter && hasFileInfo ? 'No films on the drive match that.' : 'No movies on the drive yet.'}</p>`;
     // The file filters only make sense once the drive scan has sent details.
-    document.querySelectorAll('.file-filter').forEach((el) => { el.hidden = !allGot.some((m) => m.file_info); });
+    document.querySelectorAll('.file-filter').forEach((el) => { el.hidden = !hasFileInfo; });
     document.getElementById('getList').innerHTML = buckets.get.map(libraryTile).join('')
         || '<p class="empty-state">Nothing to track down yet.</p>';
     document.getElementById('archiveList').innerHTML = watchedListHtml(buckets.archive);
@@ -379,13 +471,13 @@ function render(movies) {
     document.getElementById('recentBlock').hidden = recent.length === 0;
     document.getElementById('recentShelf').innerHTML = recent.map((m) => `
         <button class="shelf-item" onclick="showDetails('${m.imdb_id}')">
-            <span class="shelf-poster">${known(m.poster) ? `<img src="${escapeHtml(m.poster)}" alt="" loading="lazy" onerror="this.remove()">` : ''}</span>
+            <span class="shelf-poster">${known(m.poster) ? `<img src="${escapeHtml(posterAt(m.poster))}" alt="" loading="lazy" onerror="this.remove()">` : ''}</span>
             <span class="shelf-title">${escapeHtml(m.title)}</span>
             <span class="shelf-date">${formatWatchedDate(m.watched_at, { day: 'numeric', month: 'short' })}</span>
         </button>`).join('');
 
     const missingCount = allGot.filter((m) => scanMissingIds().has(m.imdb_id)).length;
-    const gotCount = gotFilter ? `${buckets.got.length} of ${plural(allGot.length, 'film')}` : plural(allGot.length, 'film');
+    const gotCount = gotFilter && hasFileInfo ? `${buckets.got.length} of ${plural(allGot.length, 'film')}` : plural(allGot.length, 'film');
     document.getElementById('gotSub').textContent = missingCount
         ? `${gotCount} on the drive · ${missingCount} missing from the folder`
         : `${gotCount} on the drive`;
@@ -405,7 +497,7 @@ function updateBackdrop() {
 
     const backdrop = document.getElementById('backdrop');
     const img = document.getElementById('backdropImg');
-    const src = known(lead?.poster);
+    const src = posterAt(known(lead?.poster));
     backdrop.classList.toggle('on', Boolean(src));
     if (src && img.getAttribute('src') !== src) img.src = src;
 }
@@ -440,25 +532,99 @@ function pickerHtml(id, status) {
         <div class="seg">${btn('got', 'Got')}${btn('get', 'Get')}${btn('archive', 'Watched')}</div>`;
 }
 
+// Moves happen on screen straight away and save in the background; a failed
+// save puts the film back. Each move offers Undo.
 async function pickStatus(id, status) {
     const local = cachedMovies.find((m) => m.imdb_id === id);
     if (local?.status === status) return;
+    const label = STATUS_LABELS[status];
 
+    if (!local) {
+        await addFilm(id, status);
+        return;
+    }
+
+    const prev = { status: local.status, watched_at: local.watched_at };
+    // Looked up each time: a library refresh in between swaps the objects.
+    const putBack = () => {
+        const m = cachedMovies.find((x) => x.imdb_id === id);
+        if (m) Object.assign(m, prev);
+        libraryChanged();
+    };
+    local.status = status;
+    local.watched_at = status === 'archive' ? todayISO() : null;
+    libraryChanged();
+    if (status === 'archive') askImdb(id);
+    else closeModal();
+
+    const saved = api('status', { body: { imdb_id: id, status } }).then(() => true, () => false);
+    // Watched gets the IMDb prompt instead, which already says it happened.
+    if (status !== 'archive') {
+        toast(`${local.title} moved to ${label}`, {
+            undo: async () => {
+                if (!(await saved)) return;
+                putBack();
+                api('status', { body: { imdb_id: id, ...prev } }).catch(() => {}).finally(fetchMovies);
+            },
+        });
+    }
+    if (await saved) saveLibrary();
+    else { putBack(); toast(`Couldn't move ${local.title}. Try again.`); }
+}
+
+// A film from search or Fresh Finds, built from the detail already loaded so
+// it appears in its list before the save comes back.
+async function addFilm(id, status) {
     const picker = document.getElementById('picker');
-    picker.querySelectorAll('.seg-btn').forEach((b) => {
+    picker?.querySelectorAll('.seg-btn').forEach((b) => {
         b.disabled = true;
         b.classList.toggle('busy', b.dataset.status === status);
     });
 
-    // An existing row only needs its status changed (which also manages
-    // watched_at); a new one has to be inserted, as the status UPDATE would
-    // match nothing and fail silently.
-    if (local) await api('status', { body: { imdb_id: id, status } });
-    else await addToVault(id, status);
-    await fetchMovies();
+    let d = detailCache[id];
+    if (!d) {
+        try { d = detailCache[id] = await (await fetch(`/api?type=detail&id=${id}`)).json(); } catch { d = null; }
+    }
+    if (!d?.Title) {
+        toast("Couldn't load that film. Try again.");
+        if (picker) picker.innerHTML = pickerHtml(id, undefined);
+        return;
+    }
 
+    const row = {
+        imdb_id: id, title: omdbText(d.Title), poster: known(d.Poster), status,
+        year: known(d.Released), runtime: known(d.Runtime), rating: known(d.imdbRating), genre: known(d.Genre),
+        is_tv_show: d.Type === 'series', watched_at: status === 'archive' ? todayISO() : null,
+        file_info: null, quality_score: null,
+    };
+    cachedMovies.push(row);
+    libraryChanged();
     if (status === 'archive') askImdb(id);
     else closeModal();
+
+    const saved = addToVault(id, status).then(() => true, () => false);
+    if (status !== 'archive') {
+        toast(`${row.title} added to ${STATUS_LABELS[status]}`, {
+            undo: async () => {
+                if (!(await saved)) return;
+                cachedMovies = cachedMovies.filter((m) => m.imdb_id !== id);
+                libraryChanged();
+                api('delete', { body: { imdb_id: id } }).catch(() => {}).finally(fetchMovies);
+            },
+        });
+    }
+    if (await saved) fetchMovies();
+    else {
+        cachedMovies = cachedMovies.filter((m) => m.imdb_id !== id);
+        libraryChanged();
+        toast(`Couldn't add ${row.title}. Try again.`);
+    }
+}
+
+// Redraw everything that shows the library after a local change.
+function libraryChanged() {
+    render(cachedMovies);
+    if (searchHits.length) renderSearch();
 }
 
 // After marking something watched, offer the IMDb page for trivia and reviews.
@@ -477,27 +643,123 @@ function askImdb(id) {
         </div>`;
 }
 
-async function removeFromModal(id) {
-    if (!confirm('Remove from your library?')) return;
-    await api('delete', { body: { imdb_id: id } });
+// Removal waits out the Undo window before it reaches the server, so undoing
+// it brings the film back exactly as it was, file details and all.
+function removeFromModal(id) {
+    const m = cachedMovies.find((x) => x.imdb_id === id);
+    if (!m) return;
     closeModal();
-    fetchMovies();
+    pendingDeletes.add(id);
+    cachedMovies = cachedMovies.filter((x) => x !== m);
+    libraryChanged();
+    toast(`${m.title} removed`, {
+        undo: () => {
+            pendingDeletes.delete(id);
+            cachedMovies.push(m);
+            libraryChanged();
+        },
+        commit: async () => {
+            try {
+                await api('delete', { body: { imdb_id: id }, keepalive: true });
+            } catch {
+                toast(`Couldn't remove ${m.title}.`);
+            }
+            pendingDeletes.delete(id);
+            fetchMovies().catch(() => {});
+        },
+    });
 }
+
+// ── Toast ─────────────────────────────────────────────────────────────────
+
+let activeToast = null;
+
+// One at a time, above the dock. `commit` runs when the toast goes without
+// Undo being tapped, including when a newer toast replaces it or the app is
+// put away.
+function toast(message, { undo, commit } = {}) {
+    settleToast();
+    const el = document.getElementById('toast');
+    el.innerHTML = `<span class="toast-msg">${escapeHtml(message)}</span>${undo ? '<button type="button" class="toast-undo">Undo</button>' : ''}`;
+    const entry = { commit, timer: setTimeout(() => settleToast(), undo ? 5000 : 3000) };
+    activeToast = entry;
+    if (undo) {
+        el.querySelector('.toast-undo').onclick = () => {
+            if (activeToast !== entry) return;
+            clearTimeout(entry.timer);
+            activeToast = null;
+            hideToast();
+            undo();
+        };
+    }
+    // Restart the entrance even when one toast replaces another.
+    el.classList.remove('show');
+    void el.offsetWidth;
+    el.classList.add('show');
+}
+
+function settleToast() {
+    const entry = activeToast;
+    if (!entry) return;
+    activeToast = null;
+    clearTimeout(entry.timer);
+    hideToast();
+    entry.commit?.();
+}
+
+// Empties it once the exit has played, so a hidden Undo can't be reached.
+function hideToast() {
+    const el = document.getElementById('toast');
+    el.classList.remove('show');
+    setTimeout(() => { if (!el.classList.contains('show')) el.innerHTML = ''; }, 300);
+}
+
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') settleToast();
+});
+
+// What's already known about a film, so the detail screen can show its
+// poster and title straight away while the full detail loads.
+function knownFilm(id) {
+    const m = cachedMovies.find((x) => x.imdb_id === id);
+    if (m) return { title: m.title, poster: m.poster, rating: m.rating };
+    const f = freshFilms.find((x) => x.imdb_id === id);
+    if (f) return { title: f.title, poster: f.poster, rating: f.rating };
+    const s = searchHits.find((x) => x.imdbID === id);
+    if (s) return { title: s.Title, poster: s.Poster };
+    return null;
+}
+
+// The hero paints the poster already in the browser cache first, then the
+// sharper one fades in over it.
+function heroHtml(poster) {
+    if (!known(poster)) return '<div class="detail-hero"></div>';
+    return `<div class="detail-hero" style="background-image:url('${escapeHtml(posterAt(poster))}')">
+        <img src="${escapeHtml(posterAt(poster, 'hero'))}" alt="" onload="this.classList.add('loaded')" onerror="this.remove()"></div>`;
+}
+
+let openDetailId = null;
 
 async function showDetails(id) {
     const modal = document.getElementById('detailsModal');
     const content = document.getElementById('modalData');
+    openDetailId = id;
     modal.classList.add('open');
     document.body.classList.add('modal-open');
 
+    if (detailCache[id]) {
+        renderDetail(id, detailCache[id]);
+        return;
+    }
+
+    const seed = knownFilm(id);
+    const line = (w, h, mb) => `<div class="skeleton-shimmer" style="width:${w}; height:${h}px; border-radius:4px; margin-bottom:${mb}px;"></div>`;
     content.innerHTML = `
         <div class="detail">
-            <div class="detail-hero skeleton-shimmer"></div>
+            ${seed ? heroHtml(seed.poster) : '<div class="detail-hero skeleton-shimmer"></div>'}
             <div class="detail-body">
-                <div class="skeleton-shimmer" style="width:75%; height:30px; border-radius:6px; margin-bottom:12px;"></div>
-                <div class="skeleton-shimmer" style="width:55%; height:16px; border-radius:4px; margin-bottom:18px;"></div>
-                <div class="skeleton-shimmer" style="width:100%; height:13px; border-radius:4px; margin-bottom:8px;"></div>
-                <div class="skeleton-shimmer" style="width:90%; height:13px; border-radius:4px;"></div>
+                ${seed ? `<h2 class="detail-title">${escapeHtml(omdbText(seed.title))}</h2>` : line('75%', 30, 12)}
+                ${line('55%', 16, 18)}${line('100%', 13, 8)}${line('90%', 13, 0)}
             </div>
         </div>`;
 
@@ -505,15 +767,20 @@ async function showDetails(id) {
     try {
         d = await (await fetch(`/api?type=detail&id=${id}`)).json();
     } catch {
-        content.innerHTML = '<p class="detail-error">Failed to load movie details. Please try again.</p>';
-        return;
+        d = null;
     }
+    // Closed, or another film opened, while this one was loading.
+    if (openDetailId !== id) return;
     if (!d || !d.Title) {
-        content.innerHTML = '<p class="detail-error">Movie details not available.</p>';
+        content.innerHTML = `<p class="detail-error">${d ? 'Movie details not available.' : 'Failed to load movie details. Please try again.'}</p>`;
         return;
     }
     detailCache[id] = d;
+    renderDetail(id, d);
+}
 
+function renderDetail(id, d) {
+    const content = document.getElementById('modalData');
     const local = cachedMovies.find(m => m.imdb_id === id);
     // What's in the file on the drive, from Dodo's scan. Only films on the drive have it.
     const file = local?.status === 'got' && local.file_info?.score ? local.file_info : null;
@@ -529,7 +796,7 @@ async function showDetails(id) {
 
     content.innerHTML = `
         <div class="detail">
-            <div class="detail-hero">${known(d.Poster) ? `<img src="${escapeHtml(d.Poster)}" alt="">` : ''}</div>
+            ${heroHtml(d.Poster)}
             <div class="detail-body">
                 <h2 class="detail-title">${escapeHtml(omdbText(d.Title))}${d.Type === 'series' ? ' <span class="tv-badge-inline">TV</span>' : ''}</h2>
                 <div class="detail-meta">
@@ -541,7 +808,7 @@ async function showDetails(id) {
                     <button class="detail-tab active" role="tab" data-tab="overview" onclick="showDetailTab('overview')">Overview</button>
                     <button class="detail-tab" role="tab" data-tab="file" onclick="showDetailTab('file')">Details</button>
                 </div>` : ''}
-                <div class="detail-panel" data-panel="overview">
+                <div class="detail-panel detail-fade" data-panel="overview">
                     ${omdbText(d.Plot) ? `<p class="detail-plot">${escapeHtml(omdbText(d.Plot))}</p>` : ''}
                     <dl class="detail-credits">${credit('Director', d.Director)}${credit('Cast', d.Actors)}</dl>
                     <div class="detail-links">
@@ -607,6 +874,7 @@ function fileDetailsHtml(f) {
 }
 
 function closeModal() {
+    openDetailId = null;
     document.getElementById('detailsModal').classList.remove('open');
     document.body.classList.remove('modal-open');
 }
@@ -635,10 +903,8 @@ async function checkPin() {
 
     if (res.ok) {
         localStorage.setItem('vault_pin', pin);
-        document.getElementById('authOverlay').style.display = 'none';
-        document.getElementById('mainApp').style.display = 'block';
         boxes.forEach(b => { b.value = ''; });
-        fetchMovies();
+        enterApp();
     } else {
         boxes.forEach(b => { b.value = ''; b.classList.add('shake'); });
         errorEl.textContent = 'Incorrect PIN — try again';

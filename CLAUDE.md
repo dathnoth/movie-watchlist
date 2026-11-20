@@ -7,7 +7,8 @@ Personal movie library PWA for Daniel. Deployed via Cloudflare Pages.
 - **Frontend**: Vanilla HTML/CSS/JS — single `index.html`, `style.css`, `app.js`. No build step, no dependencies.
 - **Database**: Cloudflare D1 (SQLite), database name `movievault`, bound as `env.DB`
 - **API**: Cloudflare Pages Function at `functions/api.js` — owns all DB access, PIN auth, and the OMDB proxy
-- **Deployment**: Push to `main` on GitHub (`dathnoth/movie-watchlist`) → auto-deploys via Cloudflare Pages
+- **Deployment**: Push to `main` on GitHub (`dathnoth/movie-watchlist`) → auto-deploys via Cloudflare Pages (project `movie-watchlist`)
+- **URL**: https://movies.danielthompson.digital (custom domain on the Pages project; `movie-watchlist-140.pages.dev` still serves the same app, which Dodo may use)
 
 ## Database
 
@@ -68,7 +69,7 @@ All on `/api?type=...`. `auth`, `search`, and `detail` are unauthenticated; `bot
 | `detail` | GET | OMDB detail by IMDb id |
 | `list` | GET | All movies, sorted by title |
 | `upsert` | POST | Insert movie, or refresh metadata if it exists (never overwrites `status`) |
-| `status` | POST | Change status; manages `watched_at` |
+| `status` | POST | Change status; manages `watched_at`. An optional `watched_at` (`YYYY-MM-DD`) is kept when moving to `'archive'`, so Undo restores the original date |
 | `delete` | POST | Remove by `imdb_id` |
 | `files` | POST | `{"files":[{"imdb_id","info","score"}],"replace":true}` — file details from Dodo's drive scan (`server/mediainfo.ts` in Dodo, on the host Mac, using the PIN like its reads). `replace` clears films no longer in the list. Returns `updated` and `unknown` (ids not in the library) |
 | `fresh` | GET | Recent digitally-released films from TMDB, minus anything already in the library |
@@ -95,6 +96,9 @@ For Dodo, Daniel's chat bot. Authenticated with `Authorization: Bearer <DODO_API
 - **Sorting** — title / release date / rating / runtime chips, shared by the poster walls; WATCHED has its own sort, defaulting to most recently watched (grouped by month)
 - **Watched** — a "Recently" shelf of the latest posters, then list rows: thumbnail, title, watched date, year, rating
 - **File quality** — Got posters show the quality score (0–100) bottom right. The detail screen gets Overview / Details tabs when the film has file details: Details shows the score breakdown, picture, sound tracks, subtitles and file. Got also has a Quality sort and 4K / Dolby Vision / Atmos filters, shown once any film has details
+- **Snappy by default** — the last library is cached in `localStorage` (`vault_library`) and drawn on launch before the network catches up; tab, sorts and Got filter persist (`vault_prefs`). The detail screen opens with the known poster and title while OMDB loads, and reuses loaded details
+- **Undo** — moves and adds apply on screen at once and save in the background (a failed save reverts with a toast). Each shows a toast with Undo; removal waits out the 5s Undo window before deleting (committed early if the app is put away), so undo restores everything including file details
+- **Posters** — OMDB/TMDB poster URLs are resized client-side by `posterAt()`: ~500px for tiles, ~1000px for the detail hero (fading in over the cached small one)
 - **Search** — full-screen sheet; TMDB via the Function proxy, debounced 300ms; results already in the library are badged with their status
 
 ## Local development

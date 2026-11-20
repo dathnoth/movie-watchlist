@@ -22,6 +22,8 @@
 }
 
 * { box-sizing: border-box; }
+/* Desktop: the page doesn't jump sideways when a sheet locks scrolling. */
+html { scrollbar-gutter: stable; }
 [hidden] { display: none !important; }
 
 body {
@@ -141,6 +143,19 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round
     transition: transform 0.15s;
 }
 .tile:active { transform: scale(0.97); }
+/* No iOS long-press image sheet on posters: a long press is just a slow tap. */
+.tile img, .shelf-poster img, .watched-thumb img, .detail-hero img { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+/* On a mouse, the whole poster lifts towards you, badges and all. */
+@media (hover: hover) {
+    .tile, .shelf-poster { transition: transform 0.25s cubic-bezier(0.2, 0, 0, 1), box-shadow 0.25s; }
+    button.tile:hover, .search-item:hover .tile, .shelf-item:hover .shelf-poster {
+        z-index: 2; transform: scale(1.05);
+        box-shadow: 0 14px 34px rgba(0, 0, 0, 0.65);
+    }
+    button.tile:hover:active, .search-item:hover:active .tile { transform: scale(1.02); }
+    .watched-row:hover { background: var(--surface); }
+}
+button:focus-visible, a:focus-visible, select:focus-visible { outline: 2px solid var(--got); outline-offset: 2px; }
 .tile img {
     position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
     opacity: 0; transition: opacity 0.35s;
@@ -162,6 +177,7 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round
 }
 .tile-tv { background: rgba(0, 0, 0, 0.62); color: #fff; }
 /* Quality score out of 100, from the file on the drive. */
+.tile-score, .tile-rating, .view-sub, .section-head small, .month-head small { font-variant-numeric: tabular-nums; }
 .tile-score {
     position: absolute; right: 6px; bottom: 6px; padding: 3px 6px; border-radius: 6px;
     background: rgba(0, 0, 0, 0.62); font-size: 11px; font-weight: 800; color: var(--q);
@@ -185,7 +201,7 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round
 /* ── Watched ────────────────────────────────────────────────────────── */
 
 .shelf {
-    display: flex; gap: 12px; overflow-x: auto; padding: 0 18px 4px;
+    display: flex; gap: 12px; overflow-x: auto; padding: 10px 18px 14px; margin: -10px 0 -10px; /* room for the hover lift, which the scroller would clip */
     scroll-snap-type: x proximity; scroll-padding: 0 18px; scrollbar-width: none;
 }
 .shelf::-webkit-scrollbar { display: none; }
@@ -287,7 +303,7 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round
 /* Full screen over the library; the dock stays on top so its button closes it. */
 .search-sheet {
     position: fixed; inset: 0; z-index: 1500; background: var(--bg);
-    overflow-y: auto; padding-bottom: calc(110px + var(--safe-bottom));
+    overflow-y: auto; overscroll-behavior: contain; padding-bottom: calc(110px + var(--safe-bottom));
     visibility: hidden; opacity: 0; transform: translateY(24px);
     transition: opacity 0.2s, transform 0.25s, visibility 0s 0.25s;
 }
@@ -406,11 +422,18 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round
     display: grid; place-items: center; font-size: 15px;
 }
 
-.detail { height: 100%; overflow-y: auto; display: flex; flex-direction: column; scrollbar-width: none; }
+.detail { height: 100%; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; scrollbar-width: none; }
 .detail::-webkit-scrollbar { display: none; }
 
-.detail-hero { position: relative; flex: none; height: min(560px, 66vh); background: #000; }
-.detail-hero img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.detail-hero {
+    position: relative; flex: none; height: min(560px, 66vh);
+    background: #000 center / cover no-repeat;
+}
+/* The sharp poster fades in over the cached small one behind it. */
+.detail-hero img { width: 100%; height: 100%; object-fit: cover; display: block; opacity: 0; transition: opacity 0.4s; }
+.detail-hero img.loaded { opacity: 1; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.detail-fade { animation: fadeIn 0.3s ease-out; }
 /* Overhangs by a pixel so no seam shows where the hero meets the page. */
 .detail-hero::after {
     content: ""; position: absolute; inset: 0 0 -1px;
@@ -504,6 +527,29 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round
 }
 .btn-imdb { background: #f5c518; color: #000; }
 .btn-quiet { background: rgba(255, 255, 255, 0.08); border: 0; color: var(--text); }
+
+/* ── Toast ──────────────────────────────────────────────────────────── */
+
+/* Confirms a move or removal, with Undo, just above the dock. */
+.toast {
+    position: fixed; z-index: 2100; left: 50%; bottom: calc(90px + var(--safe-bottom));
+    width: max-content; max-width: min(492px, calc(100% - 28px));
+    display: flex; align-items: center; gap: 4px; padding: 6px 6px 6px 16px; min-height: 48px;
+    border-radius: 99px; background: #2a2a2e; border: 1px solid var(--line);
+    box-shadow: 0 12px 34px rgba(0, 0, 0, 0.6);
+    font-size: 14px; font-weight: 600;
+    opacity: 0; visibility: hidden; transform: translate(-50%, 12px) scale(0.98);
+    transition: opacity 0.2s, transform 0.25s cubic-bezier(0.2, 0, 0, 1), visibility 0s 0.25s;
+}
+.toast.show { opacity: 1; visibility: visible; transform: translate(-50%, 0); transition: opacity 0.2s, transform 0.25s cubic-bezier(0.2, 0, 0, 1); }
+.toast-msg { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 8px; }
+/* Without Undo the pill keeps even padding on both sides. */
+.toast:not(:has(.toast-undo)) { padding-right: 16px; }
+.toast:not(:has(.toast-undo)) .toast-msg { padding-right: 0; }
+.toast-undo {
+    flex: none; height: 36px; padding: 0 14px; border: 0; border-radius: 99px; cursor: pointer;
+    background: rgba(255, 255, 255, 0.1); color: var(--got); font-weight: 800; font-size: 14px;
+}
 
 /* ── PIN ────────────────────────────────────────────────────────────── */
 

@@ -499,10 +499,14 @@ export async function onRequest(context) {
   }
 
   if (type === 'status' && request.method === 'POST') {
-    const { imdb_id, status } = await request.json();
+    const { imdb_id, status, watched_at } = await request.json();
     if (!STATUSES.includes(status)) return json({ error: 'invalid status' }, 400);
 
-    const watchedAt = status === 'archive' ? new Date().toISOString().split('T')[0] : null;
+    // Undo puts a film back on Watched with the date it already had.
+    const keepDate = typeof watched_at === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(watched_at);
+    const watchedAt = status === 'archive'
+      ? (keepDate ? watched_at : new Date().toISOString().split('T')[0])
+      : null;
     await env.DB.prepare('UPDATE movies SET status = ?, watched_at = ? WHERE imdb_id = ?')
       .bind(status, watchedAt, imdb_id)
       .run();
