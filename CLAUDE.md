@@ -8,7 +8,7 @@ Personal movie library PWA for Daniel. Deployed via Cloudflare Pages.
 - **Database**: Cloudflare D1 (SQLite), database name `movievault`, bound as `env.DB`
 - **API**: Cloudflare Pages Function at `functions/api.js` — owns all DB access, PIN auth, and the OMDB proxy
 - **Deployment**: Push to `main` on GitHub (`dathnoth/movie-watchlist`) → auto-deploys via Cloudflare Pages (project `movie-watchlist`)
-- **URL**: https://movies.danielthompson.digital (custom domain on the Pages project; `movie-watchlist-140.pages.dev` still serves the same app, which Dodo may use)
+- **URL**: https://movies.danielthompson.digital (custom domain on the Pages project). `functions/_middleware.js` redirects page requests on the old `movie-watchlist-140.pages.dev` here; its `/api` still answers directly
 
 ## Database
 
