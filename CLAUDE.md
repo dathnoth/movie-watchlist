@@ -47,7 +47,7 @@ Three states, all driven from the movie detail modal:
 - **GOT** — on the hard drive, browsable, ready to watch (the default view)
 - **WATCHED** — already watched. Stored as `'archive'` in the database; only the UI says Watched
 
-Every poster opens the detail screen, whose bottom panel is a single Got / Get / Watched control: for a film not yet in the library it adds it (Watched covers films seen at the cinema), for a saved one it moves it, with the current status shown selected. Moving a movie to Watched — or adding it there — swaps that panel for a prompt offering the IMDb page. Removing a film is also done from the detail screen.
+Every poster opens the detail screen, whose bottom panel is a Got / Get / Watched control: for a film not yet in the library it adds it (Watched covers films seen at the cinema), for a saved one it moves it, with the current status shown selected. A film already in Got shows a single **Mark as watched** button instead. Moving a movie to Watched — or adding it there — swaps that panel for a prompt offering the IMDb page. Removing a film is also done from the detail screen.
 
 ## Auth
 

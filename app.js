@@ -524,6 +524,11 @@ async function addToVault(id, status) {
 // One control for both cases: for a film not yet saved it adds it, for a
 // saved one it moves it. The current status is shown selected.
 function pickerHtml(id, status) {
+    // On the drive, the only step left is watching it.
+    if (status === 'got') {
+        return `<button class="seg-btn seg-archive watch-btn" data-status="archive"
+            onclick="pickStatus('${id}', 'archive')">${ICONS.archive}Mark as watched</button>`;
+    }
     const btn = (target, label) => `
         <button class="seg-btn seg-${target}${target === status ? ' on' : ''}" data-status="${target}"
             onclick="pickStatus('${id}', '${target}')"${target === status ? ' aria-pressed="true"' : ''}>${ICONS[target]}${label}</button>`;
